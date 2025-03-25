@@ -75,40 +75,33 @@ namespace WebApplication1
 
             // Register Swagger with Authorization configuration
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
-            //    c =>
-            //{
-            //    c.SwaggerDoc("v1", new OpenApiInfo { Title = "AI_chatbot_synthetic", Version = "v1" });
-
-            //    // **Configure JWT Bearer Authorization in Swagger**
-            //    c.AddSecurityDefinition("cookieAuth", new OpenApiSecurityScheme
-            //    {
-            //        Description = @"**Cookie-based Authentication** \r\n\r\n" +
-            //      "Swagger will use cookies obtained from successful login to authenticate subsequent requests.",
-            //        Name = "loginCookie", // Changed Name to loginCookie for clarity, though less critical
-            //        In = ParameterLocation.Cookie, // CORRECTED!  Set to ParameterLocation.Cookie
-            //        Type = SecuritySchemeType.ApiKey,
-            //        Scheme = "Cookie-based authentication"
-            //    });
-
-            //    c.AddSecurityRequirement(new OpenApiSecurityRequirement()
-            //    {
-            //        {
-            //            new OpenApiSecurityScheme
-            //            {
-            //                Reference = new OpenApiReference()
-            //                  {
-            //                    Type = ReferenceType.SecurityScheme,
-            //                    Id = "cookieAuth"
-            //                  },
-            //                  //Scheme = "oauth2",
-            //                  //Name = "Bearer",
-            //                  In = ParameterLocation.Cookie,
-            //            },
-            //            new List<string>()
-            //        }
-            //    });
-            //});
+            builder.Services.AddSwaggerGen(option =>
+            {
+                option.SwaggerDoc("v1", new OpenApiInfo { Title = "Demo API", Version = "v1" });
+                option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    In = ParameterLocation.Header,
+                    Description = "Please enter a valid token",
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    BearerFormat = "JWT",
+                    Scheme = "Bearer"
+                });
+                option.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type=ReferenceType.SecurityScheme,
+                                Id="Bearer"
+                            }
+                        },
+                        new string[]{}
+                    }
+                });
+            });
 
 
             var app = builder.Build();
