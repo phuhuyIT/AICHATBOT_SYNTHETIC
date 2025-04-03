@@ -27,52 +27,70 @@ namespace WebApplication1.Controllers
             _tokenService = tokenService;
             _authService = authService;
         }
-
+        /// <summary>
+        /// Register a new user
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
         // Register User
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO model)
         {
-            // Create the new user
-            var user = new User
+            try
             {
-                UserName = model.Username,
-                Email = model.Email,
-                IsPaidUser = false,
-                Balance = 0
-            };
-            var result = await _authService.RegisterAsync(model, user);
-            if (result != "User registered successfully.")
-            {
-                return BadRequest(result);
+                // Create the new user
+                var user = new User
+                {
+                    UserName = model.Username,
+                    Email = model.Email,
+                    IsPaidUser = false,
+                    Balance = 0
+                };
+                var result = await _authService.RegisterAsync(model, user);
+                //var jwtToken = await _tokenService.GenerateTokens(HttpContext, user);
+                return Ok("Please check your email");  // Set AccessToken and RefreshToken in cookies
             }
-
-            var jwtToken = await _tokenService.GenerateTokens(HttpContext, user);
-            return Ok(jwtToken);  // Set AccessToken and RefreshToken in cookies
+            catch (Exception message)
+            {
+                return BadRequest(message.Message);
+            }
+        }
+        // Confirm Email
+        [HttpGet("confirmemail")]
+        public async Task<IActionResult> ConfirmEmail(string email, string token)
+        {
+            try
+            {
+                var result = await _authService.ConfirmEmailAsync(email, token);
+            }catch(Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            return Ok("Đăng ký thành công!");
         }
 
         // Login action: generate both Access Token and Refresh Token
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest model)
         {
-            string result = await _authService.LoginAsync(model);
-            if(result != "Valid account.")
+            JwtToken jwtToken;
+            try
             {
-                return BadRequest(result);
+                bool result = await _authService.LoginAsync(model);
+                var user = await _userManager.FindByEmailAsync(model.Email);
+                jwtToken = await _tokenService.GenerateTokens(HttpContext, user);
             }
-            var user = await _userManager.FindByEmailAsync(model.Email);
-            var jwtToken = await _tokenService.GenerateTokens(HttpContext, user);
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
             return Ok(jwtToken);  // Set AccessToken and RefreshToken in cookies
-        }
-
-        // Verify Password (replace with actual hash verification logic)
-        private async Task<bool> VerifyPasswordAsync(string enteredPassword, User user)
-        {
-            return await _userManager.CheckPasswordAsync(user, enteredPassword);
         }
 
 
         // Logout action: clear the Refresh Token cookie
         [HttpPost("logout")]
+        [Authorize]
         public async Task<IActionResult> Logout()
         {
             // delete refresh token from database

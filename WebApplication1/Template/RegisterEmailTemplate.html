@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email Address</title>
+    <style>
+        /* Basic resets & utility styles */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6; /* Light gray background */
+            font-family: Arial, sans-serif;
+            color: #333333;
+        }
+
+        table {
+            border-spacing: 0;
+        }
+
+        td {
+            padding: 0;
+        }
+
+        /* Container */
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        /* Header Section */
+        .header {
+            background-color: #2563eb; /* Blue bar at the top */
+            color: #ffffff;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+            .header .logo {
+                max-width: 40px; /* Example logo size */
+                margin-bottom: 10px;
+            }
+
+            .header .title {
+                font-size: 24px;
+                margin: 10px 0 5px 0;
+                font-weight: bold;
+            }
+
+            .header .subtitle {
+                font-size: 18px;
+                margin: 0;
+                font-weight: normal;
+            }
+
+        /* Body Section */
+        .body-section {
+            padding: 30px 20px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #2563eb; /* Same blue as header for heading text */
+        }
+
+        p {
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+
+        /* OTP boxes */
+        .otp-container {
+            display: flex;
+            gap: 8px;
+            margin: 20px 0;
+        }
+
+        .otp-box {
+            flex: 1 1 auto;
+            border: 1px solid #2563eb;
+            border-radius: 4px;
+            text-align: center;
+            padding: 12px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+
+        /* Button */
+        .btn {
+            display: inline-block;
+            background-color: #f97316; /* Orange button */
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+            .btn:hover {
+                background-color: #ea580c; /* Slightly darker hover state */
+            }
+
+        /* Footer (optional) */
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #aaaaaa;
+            padding: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Outer wrapper to center the email in the background -->
+    <table width="100%" bgcolor="#f3f4f6">
+        <tr>
+            <td align="center">
+                <!-- Main container -->
+                <table class="container" width="600">
+                    <!-- HEADER SECTION -->
+                    <tr>
+                        <td class="header">
+                            <!-- Logo (optional) -->
+                            <img class="logo" src="https://via.placeholder.com/40" alt="Logo" />
+                            <div class="title">THANKS FOR SIGNING UP!</div>
+                            <div class="subtitle">Verify Your E-Mail Address</div>
+                        </td>
+                    </tr>
+
+                    <!-- BODY SECTION -->
+                    <tr>
+                        <td class="body-section">
+                            <h2>Hello {{USER_NAME}}</h2>
+                            <p>Please click on the link below to verify your email</p>
+                            <!-- Button -->
+                            <a href="{{VERIFY_LINK}}" class="btn">Verify Email</a>
+                        </td>
+                    </tr>
+
+                    <!-- FOOTER (Optional) -->
+                    <tr>
+                        <td class="footer">
+                            &copy; {{YEAR}} 3CBro. All rights reserved.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
