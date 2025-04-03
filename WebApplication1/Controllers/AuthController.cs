@@ -90,7 +90,7 @@ namespace WebApplication1.Controllers
 
         // Logout action: clear the Refresh Token cookie
         [HttpPost("logout")]
-        [Authorize]
+        [Authorize(Roles ="User")]
         public async Task<IActionResult> Logout()
         {
             // delete refresh token from database
@@ -109,12 +109,20 @@ namespace WebApplication1.Controllers
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken()
         {
-            var token = await _tokenService.RefreshToken(HttpContext);
-            if (token == null)
+            try
             {
-                return Unauthorized("Failed to refresh token. You must log out!");
+                var token = await _tokenService.RefreshToken(HttpContext);
+                if (token == null)
+                {
+                    return Unauthorized("Failed to refresh token. You must log out!");
+                }
+                return Ok(token);
             }
-            return Ok(token);
+            catch(Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+
         }
         [HttpPost("revoke")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]

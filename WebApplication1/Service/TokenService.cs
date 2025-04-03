@@ -20,12 +20,14 @@ namespace WebApplication1.Service
         private readonly IConfiguration _configuration;
         private readonly UserManager<User> _userManager;
         private readonly IGenericRepository<RefreshToken> _tokenRepository;
+        private readonly IUserRepository _userRepository;
 
-        public TokenService(IConfiguration configuration, UserManager<User> userManager, IGenericRepository<RefreshToken> tokenRepository)
+        public TokenService(IConfiguration configuration, UserManager<User> userManager, IGenericRepository<RefreshToken> tokenRepository, IUserRepository userRepository)
         {
             _configuration = configuration;
             _userManager = userManager;
             _tokenRepository = tokenRepository;
+            _userRepository = userRepository;
         }
         public async Task<JwtToken> GenerateTokens(HttpContext context, User user)
         {
@@ -56,11 +58,16 @@ namespace WebApplication1.Service
         }
         public string GenerateAccessToken(User user)
         {
+            var getRoles = _userRepository.GetUserRolesAsync(user).Result;
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.NameIdentifier, user.Id)
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
             };
+            foreach (var role in getRoles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
 
             var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_configuration["Jwt:Secret"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -104,16 +111,16 @@ namespace WebApplication1.Service
             var refreshToken = context.Request.Cookies["RefreshToken"];
             if (string.IsNullOrEmpty(refreshToken))
             {
-                return null;
+                throw new Exception("Refresh token is not found");
             }
             var refreshTokenEntity =  _tokenRepository.GetAllAsync().Result.FirstOrDefault(rt => rt.Token == refreshToken && rt.IsActive);
             if (refreshTokenEntity == null) {
-                return null;
+                throw new Exception("Invalid Refresh token");
             }
             var user = _userManager.FindByIdAsync(refreshTokenEntity.UserId);
             if (user == null)
             {
-                return null;
+                throw new Exception("User is not found");
             }
             var accessToken = GenerateAccessToken(user.Result);
             return accessToken;

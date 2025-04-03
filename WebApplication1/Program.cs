@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -87,9 +87,18 @@ namespace WebApplication1
             // Register Repository
             builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
 
             // Register Swagger with Authorization configuration
             builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddAuthorization(options =>
+            {
+                // Ví dụ tạo policy tên "RequireAdminRole"
+                options.AddPolicy("RequireAdminRole", policy =>
+                {
+                    policy.RequireRole("Admin");
+                });
+            });
             builder.Services.AddSwaggerGen(option =>
             {
                 option.SwaggerDoc("v1", new OpenApiInfo { Title = "Demo API", Version = "v1" });
@@ -144,9 +153,6 @@ namespace WebApplication1
             app.UseRouting(); // Make sure UseRouting is before UseAuthentication and UseAuthorization
             app.UseAuthentication();
             app.UseAuthorization();
-
-            // Using identity UI
-            app.MapRazorPages();
 
             app.MapControllers();
 

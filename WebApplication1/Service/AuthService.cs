@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.DTO.Auth;
 using WebApplication1.Models;
+using WebApplication1.Repository.Interface;
 using WebApplication1.Service.Interface;
 
 namespace WebApplication1.Service
@@ -15,10 +16,12 @@ namespace WebApplication1.Service
         private readonly UserManager<User> _userManager;
         private readonly ITokenService _tokenService;
         private readonly Interface.IEmailSender _emailSenderService;
+        private readonly IUserRepository _userRepository;
         private readonly ApplicationDbContext db;
-        public AuthService(UserManager<User> userManager, ITokenService tokenService, Interface.IEmailSender emailSender, ApplicationDbContext dbContext)
+        public AuthService(UserManager<User> userManager, ITokenService tokenService, Interface.IEmailSender emailSender, ApplicationDbContext dbContext, IUserRepository userRepository)
         {
             _userManager = userManager;
+            _userRepository = userRepository;
             _tokenService = tokenService;
             _emailSenderService = emailSender;
             db = dbContext;
@@ -63,8 +66,10 @@ namespace WebApplication1.Service
                     await transaction.RollbackAsync();
                     return result;
                 }
+                // 3. Add user to role
+                var roleResult = await _userRepository.AddUserToRoleAsync(user, "User");
                 await transaction.CommitAsync();
-                // 3. Generate the email confirmation token
+                // 4. Generate the email confirmation token
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
                 var confirmationLink = $"https://localhost:7214/api/auth/confirmemail"
