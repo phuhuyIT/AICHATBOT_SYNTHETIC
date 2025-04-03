@@ -52,7 +52,7 @@ namespace WebApplication1.Service
                 Expires = DateTime.UtcNow.AddDays(Double.Parse(_configuration["Jwt:RefreshTokenExpirationDays"]))
             });
 
-            return new JwtToken { AccessToken= accessToken};
+            return new JwtToken { AccessToken= accessToken, RefreshToken = refreshToken};
         }
         public string GenerateAccessToken(User user)
         {
