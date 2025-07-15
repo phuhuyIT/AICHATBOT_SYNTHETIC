@@ -19,13 +19,15 @@ namespace WebApplication1.Controllers
         private readonly UserManager<User> _userManager;
         private readonly ITokenService _tokenService;
         private readonly IAuthService _authService;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(UserManager<User> userManager ,ApplicationDbContext context, ITokenService tokenService, IAuthService authService)
+        public AuthController(UserManager<User> userManager ,ApplicationDbContext context, ITokenService tokenService, IAuthService authService, ILogger<AuthController> logger)
         {
             _userManager = userManager;
             _context = context;
             _tokenService = tokenService;
             _authService = authService;
+            _logger = logger;
         }
         /// <summary>
         /// Register a new user
@@ -59,14 +61,81 @@ namespace WebApplication1.Controllers
         [HttpGet("confirmemail")]
         public async Task<IActionResult> ConfirmEmail(string email, string token)
         {
+            _logger.LogInformation("ConfirmEmail request received for email: {Email}", email);
+            
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+            {
+                _logger.LogWarning("ConfirmEmail called with invalid parameters. Email: {Email}, Token provided: {TokenProvided}", 
+                    email, !string.IsNullOrWhiteSpace(token));
+                return BadRequest(new { 
+                    message = "Email hoặc token xác nhận không hợp lệ.",
+                    canResend = !string.IsNullOrWhiteSpace(email)
+                });
+            }
+
             try
             {
                 var result = await _authService.ConfirmEmailAsync(email, token);
-            }catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
+                if (result)
+                {
+                    _logger.LogInformation("Email confirmation successful for: {Email}", email);
+                    return Ok(new { message = "Đăng ký thành công!", success = true });
+                }
+                
+                _logger.LogWarning("Email confirmation failed for: {Email} - Unknown error", email);
+                return BadRequest(new { 
+                    message = "Xác nhận email thất bại!",
+                    canResend = true,
+                    email = email
+                });
             }
-            return Ok("Đăng ký thành công!");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during email confirmation for: {Email}", email);
+                
+                // Check if it's a token-related error to suggest resending
+                bool canResend = ex.Message.Contains("Token") || ex.Message.Contains("hết hạn") || ex.Message.Contains("không hợp lệ");
+                
+                return BadRequest(new { 
+                    message = $"Xác nhận email thất bại: {ex.Message}",
+                    canResend = canResend,
+                    email = email
+                });
+            }
+        }
+
+        // Resend Email Confirmation
+        [HttpPost("resend-email-confirmation")]
+        public async Task<IActionResult> ResendEmailConfirmation([FromBody] ResendEmailConfirmationDTO model)
+        {
+            _logger.LogInformation("ResendEmailConfirmation request received for email: {Email}", model.Email);
+            
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("ResendEmailConfirmation called with invalid model state for email: {Email}", model.Email);
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var result = await _authService.ResendEmailConfirmationAsync(model.Email);
+                if (result)
+                {
+                    _logger.LogInformation("Email confirmation resent successfully for: {Email}", model.Email);
+                    return Ok(new { 
+                        message = "Email xác nhận đã được gửi lại! Vui lòng kiểm tra hộp thư của bạn.",
+                        success = true
+                    });
+                }
+                
+                _logger.LogWarning("Failed to resend email confirmation for: {Email}", model.Email);
+                return BadRequest(new { message = "Không thể gửi lại email xác nhận!" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during resend email confirmation for: {Email}", model.Email);
+                return BadRequest(new { message = $"Lỗi khi gửi lại email xác nhận: {ex.Message}" });
+            }
         }
 
         // Login action: generate both Access Token and Refresh Token

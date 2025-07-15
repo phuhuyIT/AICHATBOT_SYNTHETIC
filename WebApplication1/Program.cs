@@ -87,7 +87,6 @@ namespace WebApplication1
             // Register Repository
             builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-            builder.Services.AddScoped<IUserRepository, UserRepository>();
 
             // Register Swagger with Authorization configuration
             builder.Services.AddEndpointsApiExplorer();

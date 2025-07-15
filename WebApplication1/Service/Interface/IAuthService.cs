@@ -10,5 +10,6 @@ namespace WebApplication1.Service.Interface
         Task<IdentityResult> RegisterAsync(RegisterDTO registerDTO, User user);
         Task<bool> LoginAsync(LoginRequest loginDTO);
         Task<bool> ConfirmEmailAsync(string email, string token);
+        Task<bool> ResendEmailConfirmationAsync(string email);
     }
 }

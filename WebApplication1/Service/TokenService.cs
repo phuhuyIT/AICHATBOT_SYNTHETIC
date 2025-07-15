@@ -20,14 +20,12 @@ namespace WebApplication1.Service
         private readonly IConfiguration _configuration;
         private readonly UserManager<User> _userManager;
         private readonly IGenericRepository<RefreshToken> _tokenRepository;
-        private readonly IUserRepository _userRepository;
 
-        public TokenService(IConfiguration configuration, UserManager<User> userManager, IGenericRepository<RefreshToken> tokenRepository, IUserRepository userRepository)
+        public TokenService(IConfiguration configuration, UserManager<User> userManager, IGenericRepository<RefreshToken> tokenRepository)
         {
             _configuration = configuration;
             _userManager = userManager;
             _tokenRepository = tokenRepository;
-            _userRepository = userRepository;
         }
         public async Task<JwtToken> GenerateTokens(HttpContext context, User user)
         {
@@ -58,7 +56,7 @@ namespace WebApplication1.Service
         }
         public string GenerateAccessToken(User user)
         {
-            var getRoles = _userRepository.GetUserRolesAsync(user).Result;
+            var getRoles = _userManager.GetRolesAsync(user).Result;
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.UserName),

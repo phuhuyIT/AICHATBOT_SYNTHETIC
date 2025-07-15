@@ -16,25 +16,22 @@ namespace WebApplication1.Service
         private readonly UserManager<User> _userManager;
         private readonly ITokenService _tokenService;
         private readonly Interface.IEmailSender _emailSenderService;
-        private readonly IUserRepository _userRepository;
         private readonly ApplicationDbContext db;
-        public AuthService(UserManager<User> userManager, ITokenService tokenService, Interface.IEmailSender emailSender, ApplicationDbContext dbContext, IUserRepository userRepository)
+        private readonly ILogger<AuthService> _logger;
+        
+        public AuthService(UserManager<User> userManager, ITokenService tokenService, Interface.IEmailSender emailSender, ApplicationDbContext dbContext, ILogger<AuthService> logger)
         {
             _userManager = userManager;
-            _userRepository = userRepository;
             _tokenService = tokenService;
             _emailSenderService = emailSender;
             db = dbContext;
+            _logger = logger;
         }
 
         public async Task<bool> LoginAsync(LoginRequest loginDTO)
         {
-            var user = await _userManager.FindByEmailAsync(loginDTO.Email);
-
-            if (user == null)
-            {
-                throw new Exception("Không tìm thấy Email của bạn");
-            }
+            var user = await FindUserByEmailAsync(loginDTO.Email);
+            
             var result = await _userManager.CheckPasswordAsync(user, loginDTO.Password);
             if (!result)
             {
@@ -45,71 +42,163 @@ namespace WebApplication1.Service
 
         public async Task<IdentityResult> RegisterAsync(RegisterDTO registerDTO, User user)
         {
-            // Begin the EF Core transaction
+            IdentityResult result;
+    
+            // Begin transaction for user creation only
             using var transaction = await db.Database.BeginTransactionAsync();
             try
             {
-                // 1. Check if email already exists
                 var existingUser = await _userManager.FindByEmailAsync(registerDTO.Email);
                 if (existingUser != null)
                 {
-                    // Optionally rollback, then throw
-                    await transaction.RollbackAsync();
                     throw new Exception("Email already exists.");
                 }
 
-                // 2. Create user
-                var result = await _userManager.CreateAsync(user, registerDTO.Password);
+                result = await _userManager.CreateAsync(user, registerDTO.Password);
                 if (!result.Succeeded)
                 {
-                    // Rollback and return
                     await transaction.RollbackAsync();
                     return result;
                 }
-                // 3. Add user to role
-                var roleResult = await _userRepository.AddUserToRoleAsync(user, "User");
+                
+                await _userManager.AddToRoleAsync(user, "User");
                 await transaction.CommitAsync();
-                // 4. Generate the email confirmation token
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-
-                var confirmationLink = $"https://localhost:7214/api/auth/confirmemail"
-                                       + $"?email={user.Email}&token={System.Net.WebUtility.UrlEncode(token)}";
-                var emailSubject = "Confirm your email";
-                var emailTokens = new Dictionary<string, string>
-                                    {
-                                        { "USER_NAME", user.UserName },
-                                        { "VERIFY_LINK", confirmationLink },
-                                        { "YEAR", DateTime.Now.Year.ToString() }
-                                    };
-                var emailBody = await _emailSenderService.RenderTemplateAsync("RegisterEmailTemplate.html", emailTokens);
-                await _emailSenderService.SendEmailAsync(user.Email, emailSubject, emailBody);
-
-                return result;
             }
             catch
             {
-                // If anything goes wrong, ensure the transaction is rolled back
                 await transaction.RollbackAsync();
                 throw;
             }
-        }
-        public async Task<bool> ConfirmEmailAsync(string email, string token)
-        {
+
+            // Send email after successful user creation
             try
             {
-                var user = await _userManager.FindByEmailAsync(email);
-                if (user == null)
-                {
-                    throw new Exception("Email này không tồn tại, vui lòng kiểm tra lại!");
-                } 
+                await SendEmailConfirmationAsync(user, "Confirm your email");
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw new Exception("Có lỗi khi gửi email sau khi tạo tài khoản.");
+            }
 
-                var confirmResult = await _userManager.ConfirmEmailAsync(user, token);
-                return confirmResult.Succeeded;
+            return result;
+        }
+
+        public async Task<bool> ConfirmEmailAsync(string email, string token)
+        {
+            _logger.LogInformation("Starting email confirmation process for: {Email}", email);
+            
+            ValidateEmailInput(email);
+            ValidateTokenInput(token, email);
+            
+            var user = await FindUserByEmailAsync(email);
+            _logger.LogInformation("User found for email confirmation: {Email}, UserId: {UserId}", email, user.Id);
+
+            ValidateEmailNotAlreadyConfirmed(user);
+
+            // Attempt to confirm email
+            var confirmResult = await _userManager.ConfirmEmailAsync(user, token);
+            if (!confirmResult.Succeeded)
+            {
+                var errors = string.Join(", ", confirmResult.Errors.Select(e => e.Description));
+                _logger.LogWarning("Email confirmation failed for user: {Email}, UserId: {UserId}. Errors: {Errors}", 
+                    email, user.Id, errors);
+                
+                // Check for specific error types
+                if (confirmResult.Errors.Any(e => e.Code.Contains("InvalidToken") || e.Description.Contains("Invalid token")))
+                {
+                    throw new Exception("Token xác nhận không hợp lệ hoặc đã hết hạn! Vui lòng yêu cầu gửi lại email xác nhận.");
+                }
+                
+                throw new Exception($"Xác nhận email thất bại: {errors}. Bạn có thể thử gửi lại email xác nhận.");
+            }
+
+            _logger.LogInformation("Email confirmation successful for user: {Email}, UserId: {UserId}", email, user.Id);
+            return true;
+        }
+
+        public async Task<bool> ResendEmailConfirmationAsync(string email)
+        {
+            _logger.LogInformation("Starting resend email confirmation process for: {Email}", email);
+            
+            ValidateEmailInput(email);
+            
+            var user = await FindUserByEmailAsync(email);
+            _logger.LogInformation("User found for resend email confirmation: {Email}, UserId: {UserId}", email, user.Id);
+
+            ValidateEmailNotAlreadyConfirmed(user);
+
+            try
+            {
+                await SendEmailConfirmationAsync(user, "Confirm your email - Resent");
+                _logger.LogInformation("Email confirmation resent successfully for user: {Email}, UserId: {UserId}", email, user.Id);
+                return true;
             }
             catch (Exception ex)
             {
-                throw new Exception("Error confirming email", ex);
+                _logger.LogError(ex, "Error sending email confirmation for user: {Email}, UserId: {UserId}", email, user.Id);
+                throw new Exception($"Có lỗi khi gửi email xác nhận: {ex.Message}");
             }
+        }
+
+        // Helper methods to eliminate duplicate code
+        private void ValidateEmailInput(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                _logger.LogWarning("Method called with null or empty email");
+                throw new ArgumentException("Email không được để trống.");
+            }
+        }
+
+        private void ValidateTokenInput(string token, string email)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                _logger.LogWarning("Method called with null or empty token for email: {Email}", email);
+                throw new ArgumentException("Token xác nhận không được để trống.");
+            }
+        }
+
+        private async Task<User> FindUserByEmailAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for email: {Email}", email);
+                throw new Exception("Email này không tồn tại trong hệ thống, vui lòng kiểm tra lại!");
+            }
+            return user;
+        }
+
+        private void ValidateEmailNotAlreadyConfirmed(User user)
+        {
+            if (user.EmailConfirmed)
+            {
+                _logger.LogInformation("Email already confirmed for user: {Email}, UserId: {UserId}", user.Email, user.Id);
+                throw new Exception("Email đã được xác nhận trước đó! Bạn có thể đăng nhập ngay bây giờ.");
+            }
+        }
+
+        private async Task SendEmailConfirmationAsync(User user, string subject)
+        {
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var confirmationLink = GenerateConfirmationLink(user.Email, token);
+            
+            var emailTokens = new Dictionary<string, string>
+            {
+                { "USER_NAME", user.UserName },
+                { "VERIFY_LINK", confirmationLink },
+                { "YEAR", DateTime.Now.Year.ToString() }
+            };
+            
+            var emailBody = await _emailSenderService.RenderTemplateAsync("RegisterEmailTemplate.html", emailTokens);
+            await _emailSenderService.SendEmailAsync(user.Email, subject, emailBody);
+        }
+
+        private string GenerateConfirmationLink(string email, string token)
+        {
+            return $"https://localhost:7214/api/auth/confirmemail?email={email}&token={System.Net.WebUtility.UrlEncode(token)}";
         }
     }
 }
