@@ -12,7 +12,9 @@ public partial class ChatbotModel
     public string ModelName { get; set; } = null!;
 
     public int? ApiKeyId { get; set; }
-
+    /// <summary>
+    /// Dùng mô tả các mức giá của chatbot.
+    /// </summary>
     public string? PricingTier { get; set; }
 
     public bool IsAvailableForPaidUsers { get; set; }
