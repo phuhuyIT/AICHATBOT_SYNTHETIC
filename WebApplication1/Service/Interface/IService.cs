@@ -1,12 +1,14 @@
-﻿namespace WebApplication1.Service.Interface
+﻿using WebApplication1.Service.Models;
+
+namespace WebApplication1.Service.Interface
 {
     public interface IService<T> where T : class
     {
         // crud
-        Task<string> AddAsync(T entity);
-        Task<string> DeleteAsync(int id);
-        Task<IEnumerable<T>> GetAllAsync();
-        Task<T> GetByIdAsync(int id);
-        Task<string> UpdateAsync(T entity);
+        Task<ServiceResult<T>> AddAsync(T entity);
+        Task<ServiceResult<bool>> DeleteAsync(int id);
+        Task<ServiceResult<IEnumerable<T>>> GetAllAsync();
+        Task<ServiceResult<T>> GetByIdAsync(int id);
+        Task<ServiceResult<T>> UpdateAsync(T entity);
     }
 }
