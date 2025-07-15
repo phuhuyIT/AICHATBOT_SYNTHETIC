@@ -5,8 +5,8 @@
         // CRUD method
         Task<T> GetByIdAsync(int id);
         Task<IEnumerable<T>> GetAllAsync();
-        Task<string> AddAsync(T entity);
-        Task<string> UpdateAsync(T entity);
-        Task<string> DeleteAsync(int id);
+        Task AddAsync(T entity);
+        Task UpdateAsync(T entity);
+        Task<bool> DeleteAsync(int id);
     }
 }
