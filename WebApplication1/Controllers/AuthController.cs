@@ -62,16 +62,6 @@ namespace WebApplication1.Controllers
         public async Task<IActionResult> ConfirmEmail(string email, string token)
         {
             _logger.LogInformation("ConfirmEmail request received for email: {Email}", email);
-            
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
-            {
-                _logger.LogWarning("ConfirmEmail called with invalid parameters. Email: {Email}, Token provided: {TokenProvided}", 
-                    email, !string.IsNullOrWhiteSpace(token));
-                return BadRequest(new { 
-                    message = "Email hoặc token xác nhận không hợp lệ.",
-                    canResend = !string.IsNullOrWhiteSpace(email)
-                });
-            }
 
             try
             {
