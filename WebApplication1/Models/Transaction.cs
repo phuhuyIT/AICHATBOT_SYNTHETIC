@@ -10,6 +10,8 @@ namespace WebApplication1.Models
         public decimal Amount { get; set; }
         public DateTime TransactionDate { get; set; }
         public string TransactionType { get; set; } = null!;
+        public bool IsActive { get; set; } = true;
+        public DateTime? UpdatedAt { get; set; }
         public virtual User? User { get; set; }
     }
 }

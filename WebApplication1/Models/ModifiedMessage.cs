@@ -15,5 +15,9 @@ public partial class ModifiedMessage
 
     public DateTime ModifiedAt { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public DateTime? UpdatedAt { get; set; }
+
     public virtual Message? Message { get; set; }
 }

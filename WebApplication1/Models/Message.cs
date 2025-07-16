@@ -19,6 +19,10 @@ public partial class Message
 
     public DateTime MessageTimestamp { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public DateTime? UpdatedAt { get; set; }
+
     public virtual Conversation? Conversation { get; set; }
 
     public virtual ICollection<ModifiedMessage> ModifiedMessages { get; set; } = new List<ModifiedMessage>();

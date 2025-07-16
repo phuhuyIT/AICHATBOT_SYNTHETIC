@@ -14,6 +14,7 @@ namespace WebApplication1.Models
         public DateTime Created { get; set; } = DateTime.UtcNow;
         public DateTime? Revoked { get; set; }
         public bool IsRevoked => Revoked.HasValue;
+        public DateTime? UpdatedAt { get; set; }
         public virtual User? User { get; set; }
     }
 }
