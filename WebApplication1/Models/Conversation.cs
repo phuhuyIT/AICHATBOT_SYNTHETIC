@@ -17,6 +17,10 @@ public partial class Conversation
 
     public bool IsPaidUser { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public DateTime? UpdatedAt { get; set; }
+
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 
     public virtual User? User { get; set; }
