@@ -1,19 +1,24 @@
-﻿using WebApplication1.Models;
+﻿using WebApplication1.DTO;
+using WebApplication1.DTO.ChatbotModel;
+using WebApplication1.Models;
 using WebApplication1.Repository.Interface;
 using WebApplication1.Service.Interface;
-using WebApplication1.Service.Models;
 
 namespace WebApplication1.Service;
 
-public class ChatbotModelsService : IService<ChatbotModel>
+public class ChatbotModelsService : IChatbotModelsService
 {
     private readonly ILogger<ChatbotModelsService> _logger;
     private readonly IGenericRepository<ChatbotModel> _chatbotModelsRepository;
+    private readonly IApiKeyService _apiKeyService;
 
-    public ChatbotModelsService(ILogger<ChatbotModelsService> logger, IGenericRepository<ChatbotModel> chatbotModelsRepository)
+    public ChatbotModelsService(ILogger<ChatbotModelsService> logger, 
+        IGenericRepository<ChatbotModel> chatbotModelsRepository,
+        IApiKeyService apiKeyService)
     {
         _logger = logger;
         _chatbotModelsRepository = chatbotModelsRepository;
+        _apiKeyService = apiKeyService;
     }
 
     public async Task<ServiceResult<ChatbotModel>> AddAsync(ChatbotModel entity)
@@ -46,6 +51,15 @@ public class ChatbotModelsService : IService<ChatbotModel>
     {
         try
         {
+            // First delete associated API keys
+            var apiKeyDeleteResult = await _apiKeyService.DeleteApiKeysByModelIdAsync(id);
+            if (!apiKeyDeleteResult.IsSuccess)
+            {
+                _logger.LogWarning("Failed to delete API keys for ChatbotModel {ModelId}: {Message}", 
+                    id, apiKeyDeleteResult.Message);
+            }
+
+            // Then delete the ChatbotModel
             var result = await _chatbotModelsRepository.DeleteAsync(id);
             if (result)
                 return ServiceResult<bool>.Success(true, "ChatbotModel deleted successfully");
@@ -112,6 +126,88 @@ public class ChatbotModelsService : IService<ChatbotModel>
         catch (Exception e)
         {
             _logger.LogError(e, "Error updating ChatbotModel");
+            return ServiceResult<ChatbotModel>.Failure($"Error updating ChatbotModel: {e.Message}");
+        }
+    }
+
+    public async Task<ServiceResult<ChatbotModel>> AddWithApiKeysAsync(ChatbotModelCreateDTO dto)
+    {
+        if (dto == null)
+        {
+            _logger.LogError("ChatbotModelCreateDTO is null");
+            return ServiceResult<ChatbotModel>.Failure("ChatbotModel data is null");
+        }
+
+        try
+        {
+            var chatbotModel = new ChatbotModel
+            {
+                ModelName = dto.ModelName,
+                PricingTier = dto.PricingTier,
+                IsAvailableForPaidUsers = dto.IsAvailableForPaidUsers
+            };
+
+            await _chatbotModelsRepository.AddAsync(chatbotModel);
+
+            // Use ApiKeyService to handle API keys
+            if (dto.ApiKeys != null && dto.ApiKeys.Any())
+            {
+                var apiKeyResult = await _apiKeyService.CreateApiKeysAsync(chatbotModel.Id, dto.ApiKeys);
+                if (!apiKeyResult.IsSuccess)
+                {
+                    _logger.LogWarning("Failed to create API keys for ChatbotModel {ModelId}: {Message}", 
+                        chatbotModel.Id, apiKeyResult.Message);
+                }
+            }
+
+            return ServiceResult<ChatbotModel>.Success(chatbotModel, "ChatbotModel with API keys added successfully");
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error adding ChatbotModel with API keys");
+            return ServiceResult<ChatbotModel>.Failure($"Error adding ChatbotModel: {e.Message}");
+        }
+    }
+
+    public async Task<ServiceResult<ChatbotModel>> UpdateWithApiKeysAsync(ChatbotModelUpdateDTO dto)
+    {
+        if (dto == null)
+        {
+            _logger.LogError("ChatbotModelUpdateDTO is null");
+            return ServiceResult<ChatbotModel>.Failure("ChatbotModel data is null");
+        }
+
+        try
+        {
+            var existingModel = await _chatbotModelsRepository.GetByIdAsync(dto.Id);
+            if (existingModel == null)
+            {
+                return ServiceResult<ChatbotModel>.Failure("ChatbotModel not found");
+            }
+
+            // Update ChatbotModel properties
+            existingModel.ModelName = dto.ModelName;
+            existingModel.PricingTier = dto.PricingTier;
+            existingModel.IsAvailableForPaidUsers = dto.IsAvailableForPaidUsers;
+
+            await _chatbotModelsRepository.UpdateAsync(existingModel);
+
+            // Use ApiKeyService to handle API keys
+            if (dto.ApiKeys != null)
+            {
+                var apiKeyResult = await _apiKeyService.UpdateApiKeysAsync(existingModel.Id, dto.ApiKeys);
+                if (!apiKeyResult.IsSuccess)
+                {
+                    _logger.LogWarning("Failed to update API keys for ChatbotModel {ModelId}: {Message}", 
+                        existingModel.Id, apiKeyResult.Message);
+                }
+            }
+
+            return ServiceResult<ChatbotModel>.Success(existingModel, "ChatbotModel with API keys updated successfully");
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error updating ChatbotModel with API keys");
             return ServiceResult<ChatbotModel>.Failure($"Error updating ChatbotModel: {e.Message}");
         }
     }

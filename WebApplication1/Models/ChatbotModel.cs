@@ -7,11 +7,9 @@ namespace WebApplication1.Models;
 public partial class ChatbotModel
 {
     [Key]
-    public int ModelId { get; set; }
+    public int Id { get; set; }
 
     public string ModelName { get; set; } = null!;
-
-    public int? ApiKeyId { get; set; }
     /// <summary>
     /// Dùng mô tả các mức giá của chatbot.
     /// </summary>
@@ -19,6 +17,10 @@ public partial class ChatbotModel
 
     public bool IsAvailableForPaidUsers { get; set; }
 
-    public virtual ApiKey? ApiKey { get; set; }
+    public bool IsActive { get; set; } = true;
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public virtual ICollection<ChatBotApiKey> ChatBotApiKeys { get; set; } = new List<ChatBotApiKey>();
     public virtual ICollection<UsageLog> UsageLogs { get; set; } = new List<UsageLog>();
 }
