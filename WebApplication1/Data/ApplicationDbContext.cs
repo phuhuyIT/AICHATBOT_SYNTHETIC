@@ -13,7 +13,7 @@ public class ApplicationDbContext : IdentityDbContext<User>
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<ModifiedMessage> ModifiedMessages { get; set; }
-    public DbSet<ApiKey> ApiKeys { get; set; }
+    public DbSet<ChatBotApiKey> ApiKeys { get; set; }
     public DbSet<ChatbotModel> ChatbotModels { get; set; }
     public DbSet<UsageLog> UsageLogs { get; set; }
     public DbSet<Transaction> Transactions { get; set; }
