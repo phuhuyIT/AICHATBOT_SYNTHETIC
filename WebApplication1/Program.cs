@@ -83,11 +83,21 @@ namespace WebApplication1
             builder.Services.AddControllers();
             builder.Services.AddScoped<ITokenService, TokenService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddTransient<IEmailSender, EmailSenderService>();
+            builder.Services.AddScoped<IEmailSender, EmailSenderService>();
+            builder.Services.AddScoped<IChatbotModelsService, ChatbotModelsService>();
+            builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+            
+            // Register Chat Services
+            builder.Services.AddScoped<IChatService, ChatService>();
+            builder.Services.AddScoped<IConversationService, ConversationService>();
+            builder.Services.AddHttpClient(); // Required for AI API calls
+            
             // Register Repository
             builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
+            builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
+            builder.Services.AddScoped<IMessageRepository, MessageRepository>();
             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-
+            
             // Register Swagger with Authorization configuration
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddAuthorization(options =>

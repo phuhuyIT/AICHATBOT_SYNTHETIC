@@ -1,4 +1,4 @@
-﻿using WebApplication1.Service.Models;
+﻿using WebApplication1.DTO;
 
 namespace WebApplication1.Service.Interface
 {
