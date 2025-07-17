@@ -454,9 +454,8 @@ namespace WebApplication1.Service
                 {
                     return ServiceResult<IEnumerable<string>>.Failure("Failed to retrieve available models");
                 }
-
-                // TODO: Adjust nullable warnings
-                var modelDtos = modelsResult.Data ?? Enumerable.Empty<ChatbotModelResponseDTO>();
+                
+                var modelDtos = modelsResult.Data ?? [];
                 var availableModels = modelDtos
                     .Where(m => m.IsActive && (isPaidUser || !m.IsAvailableForPaidUsers))
                     .Select(m => m.ModelName ?? string.Empty)
