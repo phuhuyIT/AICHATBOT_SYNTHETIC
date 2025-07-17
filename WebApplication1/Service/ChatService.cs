@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using WebApplication1.DTO;
+using WebApplication1.DTO.ChatbotModel;
 using WebApplication1.Models;
 using WebApplication1.Repository.Interface;
 using WebApplication1.Service.Interface;
@@ -8,8 +9,7 @@ namespace WebApplication1.Service
 {
     public class ChatService : IChatService
     {
-        private readonly IMessageRepository _messageRepository;
-        private readonly IConversationRepository _conversationRepository;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IChatbotModelsService _chatbotModelsService;
         private readonly IApiKeyService _apiKeyService;
         private readonly ILogger<ChatService> _logger;
@@ -28,15 +28,13 @@ namespace WebApplication1.Service
         };
 
         public ChatService(
-            IMessageRepository messageRepository,
-            IConversationRepository conversationRepository,
+            IUnitOfWork unitOfWork,
             IChatbotModelsService chatbotModelsService,
             IApiKeyService apiKeyService,
             ILogger<ChatService> logger,
             HttpClient httpClient)
         {
-            _messageRepository = messageRepository;
-            _conversationRepository = conversationRepository;
+            _unitOfWork = unitOfWork;
             _chatbotModelsService = chatbotModelsService;
             _apiKeyService = apiKeyService;
             _logger = logger;
@@ -48,14 +46,14 @@ namespace WebApplication1.Service
             try
             {
                 // Validate conversation access
-                var hasAccess = await _conversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<Message>.Failure("Access denied to conversation");
                 }
 
                 // Get conversation history for context
-                var conversationHistory = await _messageRepository.GetConversationMessagesAsync(conversationId);
+                var conversationHistory = await _unitOfWork.MessageRepository.GetConversationMessagesAsync(conversationId);
                 var historyList = conversationHistory.ToList();
 
                 // Get AI response
@@ -77,7 +75,8 @@ namespace WebApplication1.Service
                     UpdatedAt = DateTime.UtcNow
                 };
 
-                await _messageRepository.AddAsync(message);
+                await _unitOfWork.MessageRepository.AddAsync(message);
+                await _unitOfWork.SaveChangesAsync();
                 
                 _logger.LogInformation("Message sent successfully in conversation {ConversationId} using model {ModelName}", 
                     conversationId, modelName);
@@ -335,13 +334,13 @@ namespace WebApplication1.Service
         {
             try
             {
-                var hasAccess = await _conversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<IEnumerable<Message>>.Failure("Access denied to conversation");
                 }
 
-                var messages = await _messageRepository.GetConversationMessagesAsync(conversationId);
+                var messages = await _unitOfWork.MessageRepository.GetConversationMessagesAsync(conversationId);
                 return ServiceResult<IEnumerable<Message>>.Success(messages);
             }
             catch (Exception ex)
@@ -355,13 +354,13 @@ namespace WebApplication1.Service
         {
             try
             {
-                var hasAccess = await _conversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<IEnumerable<Message>>.Failure("Access denied to conversation");
                 }
 
-                var messages = await _messageRepository.GetPaginatedMessagesAsync(conversationId, pageNumber, pageSize);
+                var messages = await _unitOfWork.MessageRepository.GetPaginatedMessagesAsync(conversationId, pageNumber, pageSize);
                 return ServiceResult<IEnumerable<Message>>.Success(messages);
             }
             catch (Exception ex)
@@ -375,14 +374,14 @@ namespace WebApplication1.Service
         {
             try
             {
-                var message = await _messageRepository.GetByIdAsync(messageId);
+                var message = await _unitOfWork.MessageRepository.GetByIdAsync(messageId);
                 if (message == null)
                 {
                     return ServiceResult<bool>.Failure("Message not found");
                 }
 
                 // Validate user access through conversation ownership
-                var hasAccess = await _conversationRepository.IsConversationOwnedByUserAsync(message.ConversationId ?? 0, userId);
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(message.ConversationId ?? 0, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<bool>.Failure("Access denied to message");
@@ -390,7 +389,8 @@ namespace WebApplication1.Service
 
                 message.IsActive = false;
                 message.UpdatedAt = DateTime.UtcNow;
-                await _messageRepository.UpdateAsync(message);
+                await _unitOfWork.MessageRepository.UpdateAsync(message);
+                await _unitOfWork.SaveChangesAsync();
 
                 return ServiceResult<bool>.Success(true);
             }
@@ -405,20 +405,20 @@ namespace WebApplication1.Service
         {
             try
             {
-                var message = await _messageRepository.GetByIdAsync(messageId);
+                var message = await _unitOfWork.MessageRepository.GetByIdAsync(messageId);
                 if (message == null)
                 {
                     return ServiceResult<Message>.Failure("Message not found");
                 }
 
-                var hasAccess = await _conversationRepository.IsConversationOwnedByUserAsync(message.ConversationId ?? 0, userId);
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(message.ConversationId ?? 0, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<Message>.Failure("Access denied to message");
                 }
 
                 var modelToUse = newModelName ?? message.ModelUsed ?? "gpt-3.5-turbo";
-                var conversationHistory = await _messageRepository.GetConversationMessagesAsync(message.ConversationId ?? 0);
+                var conversationHistory = await _unitOfWork.MessageRepository.GetConversationMessagesAsync(message.ConversationId ?? 0);
                 
                 // Get messages before the current one for context
                 var contextMessages = conversationHistory.Where(m => m.MessageTimestamp < message.MessageTimestamp).ToList();
@@ -433,7 +433,8 @@ namespace WebApplication1.Service
                 message.ModelUsed = modelToUse;
                 message.UpdatedAt = DateTime.UtcNow;
                 
-                await _messageRepository.UpdateAsync(message);
+                await _unitOfWork.MessageRepository.UpdateAsync(message);
+                await _unitOfWork.SaveChangesAsync();
 
                 return ServiceResult<Message>.Success(message);
             }
@@ -454,9 +455,11 @@ namespace WebApplication1.Service
                     return ServiceResult<IEnumerable<string>>.Failure("Failed to retrieve available models");
                 }
 
-                var availableModels = modelsResult.Data
+                // TODO: Adjust nullable warnings
+                var modelDtos = modelsResult.Data ?? Enumerable.Empty<ChatbotModelResponseDTO>();
+                var availableModels = modelDtos
                     .Where(m => m.IsActive && (isPaidUser || !m.IsAvailableForPaidUsers))
-                    .Select(m => m.ModelName)
+                    .Select(m => m.ModelName ?? string.Empty)
                     .ToList();
 
                 return ServiceResult<IEnumerable<string>>.Success(availableModels);
