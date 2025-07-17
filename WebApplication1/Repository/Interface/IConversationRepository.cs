@@ -10,5 +10,10 @@ namespace WebApplication1.Repository.Interface
         Task<bool> DeactivateConversationAsync(int conversationId);
         Task<Conversation?> GetLatestConversationAsync(string userId);
         Task<bool> IsConversationOwnedByUserAsync(int conversationId, string userId);
+        
+        // New optimized methods
+        Task<IEnumerable<Conversation>> GetPaginatedUserConversationsAsync(
+            string userId, int pageNumber, int pageSize, bool includeMessages = false);
+        Task<int> GetUserConversationCountAsync(string userId);
     }
 }

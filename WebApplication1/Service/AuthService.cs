@@ -57,9 +57,16 @@ namespace WebApplication1.Service
                 result = await _userManager.CreateAsync(user, registerDTO.Password);
                 if (!result.Succeeded)
                 {
-                    await transaction.RollbackAsync();
-                    return result;
-                }
+                    // 1. Build a single readable message from Identity errors
+                    var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
+
+                    // 2. Log the details (good for server-side diagnostics)
+                    _logger.LogError("User creation failed for email {Email}. Errors: {Errors}",
+                        registerDTO.Email, errorMessages);
+
+                    // 3. Throw one descriptive exception so the controller can return 400
+                    throw new Exception($"Có lỗi khi tạo tài khoản: {errorMessages}");
+                }   
                 
                 await _userManager.AddToRoleAsync(user, "User");
                 await transaction.CommitAsync();

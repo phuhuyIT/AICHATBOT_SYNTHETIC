@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Security.Claims;
 using WebApplication1.DTO;
+using WebApplication1.Models;
 using WebApplication1.Service.Interface;
 
 namespace WebApplication1.Controllers
@@ -9,22 +11,12 @@ namespace WebApplication1.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class ChatController : ControllerBase
+    public class ChatController(
+        IChatService _chatService,
+        IConversationService _conversationService,
+        ILogger<ChatController> _logger)
+        : ControllerBase
     {
-        private readonly IChatService _chatService;
-        private readonly IConversationService _conversationService;
-        private readonly ILogger<ChatController> _logger;
-
-        public ChatController(
-            IChatService chatService,
-            IConversationService conversationService,
-            ILogger<ChatController> logger)
-        {
-            _chatService = chatService;
-            _conversationService = conversationService;
-            _logger = logger;
-        }
-
         /// <summary>
         /// Send a message to the AI chatbot
         /// </summary>
@@ -180,12 +172,13 @@ namespace WebApplication1.Controllers
                     return BadRequest(conversationsResult.Message);
                 }
 
-                var conversationSummaries = conversationsResult.Data.Select(c => new ConversationSummary
+                var conversations = conversationsResult.Data ?? Enumerable.Empty<Conversation>();
+                var conversationSummaries = conversations.Select(c => new ConversationSummary
                 {
                     ConversationId = c.ConversationId,
                     StartedAt = c.StartedAt,
                     EndedAt = c.EndedAt,
-                    MessageCount = c.Messages?.Count ?? 0,
+                    MessageCount = c.Messages?.Count() ?? 0,
                     LastMessage = c.Messages?.LastOrDefault()?.UserMessage,
                     IsActive = c.IsActive
                 }).ToList();
@@ -306,12 +299,17 @@ namespace WebApplication1.Controllers
                     return BadRequest(result.Message);
                 }
 
+                if (result.Data == null)
+                {
+                    return StatusCode(500, "Failed to regenerate response");
+                }
+
                 var response = new SendMessageResponse
                 {
                     MessageId = result.Data.MessageId,
                     UserMessage = result.Data.UserMessage,
                     AiResponse = result.Data.AiResponse,
-                    ModelUsed = result.Data.ModelUsed ?? "",
+                    ModelUsed = result.Data.ModelUsed ?? string.Empty,
                     MessageTimestamp = result.Data.MessageTimestamp,
                     ConversationId = result.Data.ConversationId ?? 0
                 };

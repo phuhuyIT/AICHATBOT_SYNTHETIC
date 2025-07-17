@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Models;
 using WebApplication1.Service.Interface;
 using WebApplication1.DTO.ChatbotModel;
@@ -44,7 +44,7 @@ public class ChatBotModelsController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(new { success = false, message = "Invalid model data", errors = ModelState });
 
-        var result = await _chatbotService.AddWithApiKeysAsync(model);
+        var result = await _chatbotService.CreateAsync(model);
         
         if (result.IsSuccess)
             return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, 
@@ -62,7 +62,7 @@ public class ChatBotModelsController : ControllerBase
         if (id != model.Id)
             return BadRequest(new { success = false, message = "ID mismatch" });
 
-        var result = await _chatbotService.UpdateWithApiKeysAsync(model);
+        var result = await _chatbotService.UpdateAsync(id, model);
         
         if (result.IsSuccess)
             return Ok(new { success = true, message = result.Message, data = result.Data });
