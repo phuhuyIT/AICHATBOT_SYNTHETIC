@@ -24,6 +24,7 @@ namespace WebApplication1
 
             // Register memory caching
             builder.Services.AddMemoryCache();
+            builder.Services.AddScoped<ICacheService, MemoryCacheService>();
 
             // Register the DbContext with the connection string
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -96,7 +97,9 @@ namespace WebApplication1
             builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
             builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
             builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+            builder.Services.AddScoped<IChatbotModelsRepository, ChatbotModelsRepository>();
             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             
             // Register Swagger with Authorization configuration
             builder.Services.AddEndpointsApiExplorer();

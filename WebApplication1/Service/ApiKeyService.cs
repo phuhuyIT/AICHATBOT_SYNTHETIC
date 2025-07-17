@@ -1,8 +1,10 @@
-﻿using WebApplication1.DTO;
+using WebApplication1.DTO;
+using WebApplication1.DTO.ApiKey;
 using WebApplication1.DTO.ChatbotModel;
 using WebApplication1.Models;
 using WebApplication1.Repository.Interface;
 using WebApplication1.Service.Interface;
+using ApiKeyCreateDTO = WebApplication1.DTO.ApiKey.ApiKeyCreateDTO;
 
 namespace WebApplication1.Service
 {
@@ -17,35 +19,49 @@ namespace WebApplication1.Service
             _apiKeyRepository = apiKeyRepository;
         }
 
-        #region IService<ChatBotApiKey> Implementation
+        #region IReadService / IWriteService Implementation
 
-        public async Task<ServiceResult<ChatBotApiKey>> AddAsync(ChatBotApiKey entity)
+        // CREATE
+        public async Task<ServiceResult<ApiKeyResponseDTO>> CreateAsync(ApiKeyCreateDTO createDto)
         {
-            if (entity == null)
-            {
-                _logger.LogError("ChatBotApiKey is null");
-                return ServiceResult<ChatBotApiKey>.Failure("API key data is null");
-            }
+            return await CreateInternalAsync(createDto);
+        }
 
-            if (string.IsNullOrEmpty(entity.ApiKey))
-            {
-                _logger.LogError("API key value is null or empty");
-                return ServiceResult<ChatBotApiKey>.Failure("API key value is required");
-            }
-
+        // READ ALL
+        public async Task<ServiceResult<IEnumerable<ApiKeyResponseDTO>>> GetAllAsync()
+        {
             try
             {
-                entity.CreatedAt = DateTime.UtcNow;
-                await _apiKeyRepository.AddAsync(entity);
-                return ServiceResult<ChatBotApiKey>.Success(entity, "API key added successfully");
+                var entities = await _apiKeyRepository.GetAllAsync();
+                var dtos = ApiKeyMappingService.ToResponseDTOList(entities);
+                return ServiceResult<IEnumerable<ApiKeyResponseDTO>>.Success(dtos);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error adding API key");
-                return ServiceResult<ChatBotApiKey>.Failure($"Error adding API key: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving all API keys");
+                return ServiceResult<IEnumerable<ApiKeyResponseDTO>>.Failure("Failed to retrieve API keys");
             }
         }
 
+        // READ SINGLE
+        public async Task<ServiceResult<ApiKeyResponseDTO>> GetByIdAsync(int id)
+        {
+            return await GetByIdInternalAsync(id);
+        }
+
+        // UPDATE
+        public async Task<ServiceResult<ApiKeyResponseDTO>> UpdateAsync(int id, ApiKeyUpdateDTO updateDto)
+        {
+            if (updateDto == null)
+            {
+                return ServiceResult<ApiKeyResponseDTO>.Failure("API key data is null");
+            }
+            // Ensure path param and DTO id match
+            updateDto.ApiKeyId = id;
+            return await UpdateInternalAsync(updateDto);
+        }
+
+        // DELETE
         public async Task<ServiceResult<bool>> DeleteAsync(int id)
         {
             try
@@ -63,67 +79,156 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<IEnumerable<ChatBotApiKey>>> GetAllAsync()
+        #endregion
+
+        #region DTO-Based CRUD Operations
+
+        private async Task<ServiceResult<ApiKeyResponseDTO>> CreateInternalAsync(ApiKeyCreateDTO dto)
         {
+            if (dto == null)
+            {
+                _logger.LogError("ApiKeyCreateDTO is null");
+                return ServiceResult<ApiKeyResponseDTO>.Failure("API key data is null");
+            }
+
             try
             {
-                var apiKeys = await _apiKeyRepository.GetAllAsync();
-                return ServiceResult<IEnumerable<ChatBotApiKey>>.Success(apiKeys);
+                // Check if API key is unique
+                var isUniqueResult = await IsApiKeyUniqueAsync(dto.ApiKey);
+                if (!isUniqueResult.IsSuccess || !isUniqueResult.Data)
+                {
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("API key already exists");
+                }
+
+                var entity = ApiKeyMappingService.ToEntity(dto);
+                await _apiKeyRepository.AddAsync(entity);
+                
+                var responseDto = ApiKeyMappingService.ToResponseDTO(entity);
+                if (responseDto == null)
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("Failed to map API key");
+                
+                return ServiceResult<ApiKeyResponseDTO>.Success(responseDto, "API key created successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving all API keys");
-                return ServiceResult<IEnumerable<ChatBotApiKey>>.Failure($"Error retrieving API keys: {ex.Message}");
+                _logger.LogError(ex, "Error creating API key");
+                return ServiceResult<ApiKeyResponseDTO>.Failure($"Error creating API key: {ex.Message}");
             }
         }
 
-        public async Task<ServiceResult<ChatBotApiKey>> GetByIdAsync(int id)
+        private async Task<ServiceResult<ApiKeyResponseDTO>> GetByIdInternalAsync(int id)
         {
             try
             {
-                var apiKey = await _apiKeyRepository.GetByIdAsync(id);
-                if (apiKey == null)
-                    return ServiceResult<ChatBotApiKey>.Failure("API key not found");
+                var entity = await _apiKeyRepository.GetByIdAsync(id);
+                if (entity == null)
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("API key not found");
 
-                return ServiceResult<ChatBotApiKey>.Success(apiKey);
+                var responseDto = ApiKeyMappingService.ToResponseDTO(entity);
+                if (responseDto == null)
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("Failed to map API key");
+                
+                return ServiceResult<ApiKeyResponseDTO>.Success(responseDto);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting API key {ApiKeyId}", id);
-                return ServiceResult<ChatBotApiKey>.Failure($"Error getting API key: {ex.Message}");
+                return ServiceResult<ApiKeyResponseDTO>.Failure($"Error getting API key: {ex.Message}");
             }
         }
 
-        public async Task<ServiceResult<ChatBotApiKey>> UpdateAsync(ChatBotApiKey entity)
+        private async Task<ServiceResult<List<ApiKeyListDTO>>> GetAllInternalListDtoAsync()
         {
-            if (entity == null)
+            try
             {
-                _logger.LogError("ChatBotApiKey is null");
-                return ServiceResult<ChatBotApiKey>.Failure("API key data is null");
+                var entities = await _apiKeyRepository.GetAllAsync();
+                var listDtos = ApiKeyMappingService.ToListDTOList(entities);
+                return ServiceResult<List<ApiKeyListDTO>>.Success(listDtos ?? new List<ApiKeyListDTO>());
             }
-
-            if (string.IsNullOrEmpty(entity.ApiKey))
+            catch (Exception ex)
             {
-                _logger.LogError("API key value is null or empty");
-                return ServiceResult<ChatBotApiKey>.Failure("API key value is required");
+                _logger.LogError(ex, "Error retrieving all API keys");
+                return ServiceResult<List<ApiKeyListDTO>>.Failure($"Error retrieving API keys: {ex.Message}");
+            }
+        }
+
+        private async Task<ServiceResult<ApiKeyResponseDTO>> UpdateInternalAsync(ApiKeyUpdateDTO dto)
+        {
+            if (dto == null)
+            {
+                _logger.LogError("ApiKeyUpdateDTO is null");
+                return ServiceResult<ApiKeyResponseDTO>.Failure("API key data is null");
             }
 
             try
             {
-                entity.UpdatedAt = DateTime.UtcNow;
-                await _apiKeyRepository.UpdateAsync(entity);
-                return ServiceResult<ChatBotApiKey>.Success(entity, "API key updated successfully");
+                var existingEntity = await _apiKeyRepository.GetByIdAsync(dto.ApiKeyId);
+                if (existingEntity == null)
+                {
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("API key not found");
+                }
+
+                // Check if API key is unique (excluding current record)
+                var isUniqueResult = await IsApiKeyUniqueAsync(dto.ApiKey, dto.ApiKeyId);
+                if (!isUniqueResult.IsSuccess || !isUniqueResult.Data)
+                {
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("API key already exists");
+                }
+
+                ApiKeyMappingService.UpdateEntity(existingEntity, dto);
+                await _apiKeyRepository.UpdateAsync(existingEntity);
+                
+                var responseDto = ApiKeyMappingService.ToResponseDTO(existingEntity);
+                if (responseDto == null)
+                    return ServiceResult<ApiKeyResponseDTO>.Failure("Failed to map API key");
+                
+                return ServiceResult<ApiKeyResponseDTO>.Success(responseDto, "API key updated successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating API key");
-                return ServiceResult<ChatBotApiKey>.Failure($"Error updating API key: {ex.Message}");
+                return ServiceResult<ApiKeyResponseDTO>.Failure($"Error updating API key: {ex.Message}");
             }
         }
 
         #endregion
 
-        #region Custom API Key Methods
+        #region Model-Specific Operations
+
+        public async Task<ServiceResult<List<ChatBotApiKey>>> GetApiKeysByModelIdAsync(int modelId)
+        {
+            try
+            {
+                var allEntities = await _apiKeyRepository.GetAllAsync();
+                var modelEntities = allEntities.Where(k => k.ChatbotModelId == modelId).ToList();
+                return ServiceResult<List<ChatBotApiKey>>.Success(modelEntities);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting API keys for ChatbotModel {ChatbotModelId}", modelId);
+                return ServiceResult<List<ChatBotApiKey>>.Failure($"Error getting API keys: {ex.Message}");
+            }
+        }
+        
+        public async Task<ServiceResult<List<ApiKeyResponseDTO>>> GetApiKeysByModelIdWithDtoAsync(int modelId)
+        {
+            try
+            {
+                var result = await GetApiKeysByModelIdAsync(modelId);
+                if (!result.IsSuccess)
+                {
+                    return ServiceResult<List<ApiKeyResponseDTO>>.Failure(result.Message);
+                }
+                
+                var responseDtos = ApiKeyMappingService.ToResponseDTOList(result.Data);
+                return ServiceResult<List<ApiKeyResponseDTO>>.Success(responseDtos);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting API keys with DTOs for ChatbotModel {ChatbotModelId}", modelId);
+                return ServiceResult<List<ApiKeyResponseDTO>>.Failure($"Error getting API keys: {ex.Message}");
+            }
+        }
 
         public async Task<ServiceResult<List<ChatBotApiKey>>> CreateApiKeysAsync(int chatbotModelId, List<ApiKeyCreateDTO> apiKeyDtos)
         {
@@ -134,23 +239,47 @@ namespace WebApplication1.Service
 
             try
             {
-                var createdApiKeys = new List<ChatBotApiKey>();
+                var createdEntities = new List<ChatBotApiKey>();
 
                 foreach (var apiKeyDto in apiKeyDtos)
                 {
-                    var apiKey = new ChatBotApiKey
-                    {
-                        ApiKey = apiKeyDto.ApiKeyValue,
-                        Setting = apiKeyDto.Description,
-                        IsActive = apiKeyDto.IsActive,
-                        ChatbotModelId = chatbotModelId,
-                        CreatedAt = DateTime.UtcNow
-                    };
+                    // Set the model ID for each API key
+                    apiKeyDto.ChatbotModelId = chatbotModelId;
+                    
+                    var entity = ApiKeyMappingService.ToEntity(apiKeyDto);
+                    await _apiKeyRepository.AddAsync(entity);
+                    createdEntities.Add(entity);
+                }
 
-                    var result = await AddAsync(apiKey);
-                    if (result.IsSuccess)
+                return ServiceResult<List<ChatBotApiKey>>.Success(createdEntities, "API keys created successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating API keys for ChatbotModel {ChatbotModelId}", chatbotModelId);
+                return ServiceResult<List<ChatBotApiKey>>.Failure($"Error creating API keys: {ex.Message}");
+            }
+        }
+        
+        public async Task<ServiceResult<List<ApiKeyResponseDTO>>> CreateApiKeysWithDtoAsync(int chatbotModelId, List<ApiKeyCreateDTO> apiKeyDtos)
+        {
+            if (apiKeyDtos == null || !apiKeyDtos.Any())
+            {
+                return ServiceResult<List<ApiKeyResponseDTO>>.Success(new List<ApiKeyResponseDTO>(), "No API keys to create");
+            }
+
+            try
+            {
+                var createdResponseDtos = new List<ApiKeyResponseDTO>();
+
+                foreach (var apiKeyDto in apiKeyDtos)
+                {
+                    // Set the model ID for each API key
+                    apiKeyDto.ChatbotModelId = chatbotModelId;
+                    
+                    var result = await CreateInternalAsync(apiKeyDto);
+                    if (result.IsSuccess && result.Data != null)
                     {
-                        createdApiKeys.Add(result.Data);
+                        createdResponseDtos.Add(result.Data);
                     }
                     else
                     {
@@ -158,12 +287,12 @@ namespace WebApplication1.Service
                     }
                 }
 
-                return ServiceResult<List<ChatBotApiKey>>.Success(createdApiKeys, "API keys created successfully");
+                return ServiceResult<List<ApiKeyResponseDTO>>.Success(createdResponseDtos, "API keys created successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating API keys for ChatbotModel {ChatbotModelId}", chatbotModelId);
-                return ServiceResult<List<ChatBotApiKey>>.Failure($"Error creating API keys: {ex.Message}");
+                return ServiceResult<List<ApiKeyResponseDTO>>.Failure($"Error creating API keys: {ex.Message}");
             }
         }
 
@@ -178,37 +307,18 @@ namespace WebApplication1.Service
             {
                 foreach (var apiKeyDto in apiKeyDtos)
                 {
-                    if (apiKeyDto.IsDeleted && apiKeyDto.Id.HasValue)
+                    // Set the model ID for each API key
+                    apiKeyDto.ChatbotModelId = chatbotModelId;
+                    
+                    var existingEntity = await _apiKeyRepository.GetByIdAsync(apiKeyDto.ApiKeyId);
+                    if (existingEntity != null)
                     {
-                        // Delete existing API key
-                        await DeleteAsync(apiKeyDto.Id.Value);
-                    }
-                    else if (apiKeyDto.Id.HasValue)
-                    {
-                        // Update existing API key
-                        var existingApiKey = await GetByIdAsync(apiKeyDto.Id.Value);
-                        if (existingApiKey.IsSuccess)
-                        {
-                            existingApiKey.Data.ApiKey = apiKeyDto.ApiKeyValue;
-                            existingApiKey.Data.Setting = apiKeyDto.Description;
-                            existingApiKey.Data.IsActive = apiKeyDto.IsActive;
-
-                            await UpdateAsync(existingApiKey.Data);
-                        }
+                        ApiKeyMappingService.UpdateEntity(existingEntity, apiKeyDto);
+                        await _apiKeyRepository.UpdateAsync(existingEntity);
                     }
                     else
                     {
-                        // Add new API key
-                        var newApiKey = new ChatBotApiKey
-                        {
-                            ApiKey = apiKeyDto.ApiKeyValue,
-                            Setting = apiKeyDto.Description,
-                            IsActive = apiKeyDto.IsActive,
-                            ChatbotModelId = chatbotModelId,
-                            CreatedAt = DateTime.UtcNow
-                        };
-
-                        await AddAsync(newApiKey);
+                        _logger.LogWarning("API key with ID {ApiKeyId} not found for update", apiKeyDto.ApiKeyId);
                     }
                 }
 
@@ -225,10 +335,10 @@ namespace WebApplication1.Service
         {
             try
             {
-                var apiKeys = await GetApiKeysByModelIdAsync(chatbotModelId);
-                if (apiKeys.IsSuccess && apiKeys.Data.Any())
+                var apiKeysResult = await GetApiKeysByModelIdAsync(chatbotModelId);
+                if (apiKeysResult.IsSuccess && apiKeysResult.Data != null && apiKeysResult.Data.Any())
                 {
-                    foreach (var apiKey in apiKeys.Data)
+                    foreach (var apiKey in apiKeysResult.Data)
                     {
                         await DeleteAsync(apiKey.ApiKeyId);
                     }
@@ -243,38 +353,22 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<List<ChatBotApiKey>>> GetApiKeysByModelIdAsync(int chatbotModelId)
-        {
-            try
-            {
-                var allApiKeys = await GetAllAsync();
-                if (allApiKeys.IsSuccess)
-                {
-                    var modelApiKeys = allApiKeys.Data.Where(k => k.ChatbotModelId == chatbotModelId).ToList();
-                    return ServiceResult<List<ChatBotApiKey>>.Success(modelApiKeys);
-                }
+        #endregion
 
-                return ServiceResult<List<ChatBotApiKey>>.Failure("Failed to retrieve API keys");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting API keys for ChatbotModel {ChatbotModelId}", chatbotModelId);
-                return ServiceResult<List<ChatBotApiKey>>.Failure($"Error getting API keys: {ex.Message}");
-            }
-        }
+        #region Validation and Utility Operations
 
         public async Task<ServiceResult<bool>> ValidateApiKeyAsync(string apiKeyValue)
         {
             try
             {
-                var allApiKeys = await GetAllAsync();
-                if (allApiKeys.IsSuccess)
+                if (string.IsNullOrEmpty(apiKeyValue))
                 {
-                    var exists = allApiKeys.Data.Any(k => k.ApiKey == apiKeyValue && k.IsActive);
-                    return ServiceResult<bool>.Success(exists, exists ? "API key is valid" : "API key is invalid or inactive");
+                    return ServiceResult<bool>.Success(false, "API key value is empty");
                 }
 
-                return ServiceResult<bool>.Failure("Failed to validate API key");
+                var allEntities = await _apiKeyRepository.GetAllAsync();
+                var exists = allEntities.Any(k => k.ApiKey == apiKeyValue && k.IsActive);
+                return ServiceResult<bool>.Success(exists, exists ? "API key is valid" : "API key is invalid or inactive");
             }
             catch (Exception ex)
             {
@@ -287,28 +381,43 @@ namespace WebApplication1.Service
         {
             try
             {
-                var allApiKeys = await GetAllAsync();
-                if (allApiKeys.IsSuccess)
+                var allEntities = await _apiKeyRepository.GetAllAsync();
+                var apiKey = allEntities
+                    .Where(k => k.IsActive && k.ChatbotModel != null && k.ChatbotModel.ModelName == modelName)
+                    .Select(k => k.ApiKey)
+                    .FirstOrDefault();
+
+                if (!string.IsNullOrEmpty(apiKey))
                 {
-                    var apiKey = allApiKeys.Data
-                        .Where(k => k.IsActive && k.ChatbotModel != null && k.ChatbotModel.ModelName == modelName)
-                        .Select(k => k.ApiKey)
-                        .FirstOrDefault();
-
-                    if (!string.IsNullOrEmpty(apiKey))
-                    {
-                        return ServiceResult<string>.Success(apiKey);
-                    }
-                    
-                    return ServiceResult<string>.Failure($"No active API key found for model: {modelName}");
+                    return ServiceResult<string>.Success(apiKey);
                 }
-
-                return ServiceResult<string>.Failure("Failed to retrieve API keys");
+                
+                return ServiceResult<string>.Failure($"No active API key found for model: {modelName}");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting API key for model {ModelName}", modelName);
                 return ServiceResult<string>.Failure($"Error getting API key for model: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResult<bool>> IsApiKeyUniqueAsync(string apiKeyValue, int? excludeId = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(apiKeyValue))
+                {
+                    return ServiceResult<bool>.Success(false, "API key value is empty");
+                }
+                
+                var allEntities = await _apiKeyRepository.GetAllAsync();
+                var exists = allEntities.Any(k => k.ApiKey == apiKeyValue && (!excludeId.HasValue || k.ApiKeyId != excludeId.Value));
+                return ServiceResult<bool>.Success(!exists);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking API key uniqueness");
+                return ServiceResult<bool>.Failure($"Error checking API key uniqueness: {ex.Message}");
             }
         }
 

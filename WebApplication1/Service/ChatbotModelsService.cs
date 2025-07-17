@@ -1,4 +1,4 @@
-﻿using WebApplication1.DTO;
+using WebApplication1.DTO;
 using WebApplication1.DTO.ChatbotModel;
 using WebApplication1.Models;
 using WebApplication1.Repository.Interface;
@@ -21,30 +21,49 @@ public class ChatbotModelsService : IChatbotModelsService
         _apiKeyService = apiKeyService;
     }
 
-    public async Task<ServiceResult<ChatbotModel>> AddAsync(ChatbotModel entity)
-    {
-        if (entity == null)
-        {
-            _logger.LogError("ChatbotModel is null");
-            return ServiceResult<ChatbotModel>.Failure("ChatbotModel is null");
-        }
-        
-        if (string.IsNullOrEmpty(entity.ModelName))
-        {
-            _logger.LogError("ChatbotModel name is null or empty");
-            return ServiceResult<ChatbotModel>.Failure("ChatbotModel name is null or empty");
-        }
+    #region IReadService / IWriteService Implementation
 
-        try
-        {
-            await _chatbotModelsRepository.AddAsync(entity);
-            return ServiceResult<ChatbotModel>.Success(entity, "ChatbotModel added successfully");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error adding ChatbotModel");
-            return ServiceResult<ChatbotModel>.Failure($"Error adding ChatbotModel: {e.Message}");
-        }
+    public async Task<ServiceResult<ChatbotModelResponseDTO>> CreateAsync(ChatbotModelCreateDTO createDto)
+    {
+        var result = await CreateInternalAsync(createDto);
+        if (!result.IsSuccess)
+            return ServiceResult<ChatbotModelResponseDTO>.Failure(result.Message);
+        var response = ChatbotModelMappingService.ToResponseDTO(result.Data);
+        if (response == null)
+            return ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
+        return ServiceResult<ChatbotModelResponseDTO>.Success(response, result.Message);
+    }
+
+    public async Task<ServiceResult<IEnumerable<ChatbotModelResponseDTO>>> GetAllAsync()
+    {
+        var listResult = await base_GetAllModels();
+        if (!listResult.IsSuccess)
+            return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Failure(listResult.Message);
+        var dtos = ChatbotModelMappingService.ToResponseDTOList(listResult.Data);
+        return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Success(dtos ?? new List<ChatbotModelResponseDTO>());
+    }
+
+    public async Task<ServiceResult<ChatbotModelResponseDTO>> GetByIdAsync(int id)
+    {
+        var modelResult = await base_GetModelById(id);
+        if (!modelResult.IsSuccess)
+            return ServiceResult<ChatbotModelResponseDTO>.Failure(modelResult.Message);
+        var dto = ChatbotModelMappingService.ToResponseDTO(modelResult.Data);
+        if (dto == null)
+            return ServiceResult<ChatbotModelResponseDTO>.Failure("Chatbot model not found");
+        return ServiceResult<ChatbotModelResponseDTO>.Success(dto);
+    }
+
+    public async Task<ServiceResult<ChatbotModelResponseDTO>> UpdateAsync(int id, ChatbotModelUpdateDTO updateDto)
+    {
+        updateDto.Id = id;
+        var result = await UpdateInternalAsync(updateDto);
+        if (!result.IsSuccess)
+            return ServiceResult<ChatbotModelResponseDTO>.Failure(result.Message);
+        var dto = ChatbotModelMappingService.ToResponseDTO(result.Data);
+        if (dto == null)
+            return ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
+        return ServiceResult<ChatbotModelResponseDTO>.Success(dto, result.Message);
     }
 
     public async Task<ServiceResult<bool>> DeleteAsync(int id)
@@ -55,8 +74,7 @@ public class ChatbotModelsService : IChatbotModelsService
             var apiKeyDeleteResult = await _apiKeyService.DeleteApiKeysByModelIdAsync(id);
             if (!apiKeyDeleteResult.IsSuccess)
             {
-                _logger.LogWarning("Failed to delete API keys for ChatbotModel {ModelId}: {Message}", 
-                    id, apiKeyDeleteResult.Message);
+                _logger.LogWarning("Failed to delete API keys for ChatbotModel {ModelId}: {Message}", id, apiKeyDeleteResult.Message);
             }
 
             // Then delete the ChatbotModel
@@ -73,7 +91,10 @@ public class ChatbotModelsService : IChatbotModelsService
         }
     }
 
-    public async Task<ServiceResult<IEnumerable<ChatbotModel>>> GetAllAsync()
+    #endregion
+
+    // Helper wrappers around existing private/obsolete methods
+    private async Task<ServiceResult<IEnumerable<ChatbotModel>>> base_GetAllModels()
     {
         try
         {
@@ -82,55 +103,28 @@ public class ChatbotModelsService : IChatbotModelsService
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error retrieving all ChatbotModels");
-            return ServiceResult<IEnumerable<ChatbotModel>>.Failure($"Error retrieving ChatbotModels: {e.Message}");
+            _logger.LogError(e, "Error retrieving all ChatbotModels (helper)");
+            return ServiceResult<IEnumerable<ChatbotModel>>.Failure($"Error: {e.Message}");
         }
     }
 
-    public async Task<ServiceResult<ChatbotModel>> GetByIdAsync(int id)
+    private async Task<ServiceResult<ChatbotModel>> base_GetModelById(int id)
     {
         try
         {
             var model = await _chatbotModelsRepository.GetByIdAsync(id);
             if (model == null)
                 return ServiceResult<ChatbotModel>.Failure("ChatbotModel not found");
-            
             return ServiceResult<ChatbotModel>.Success(model);
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error retrieving ChatbotModel with ID {Id}", id);
-            return ServiceResult<ChatbotModel>.Failure($"Error retrieving ChatbotModel: {e.Message}");
+            _logger.LogError(e, "Error retrieving ChatbotModel (helper)");
+            return ServiceResult<ChatbotModel>.Failure($"Error: {e.Message}");
         }
     }
 
-    public async Task<ServiceResult<ChatbotModel>> UpdateAsync(ChatbotModel entity)
-    {
-        if (entity == null)
-        {
-            _logger.LogError("ChatbotModel is null");
-            return ServiceResult<ChatbotModel>.Failure("ChatbotModel is null");
-        }
-        
-        if (string.IsNullOrEmpty(entity.ModelName))
-        {
-            _logger.LogError("ChatbotModel name is null or empty");
-            return ServiceResult<ChatbotModel>.Failure("ChatbotModel name is null or empty");
-        }
-
-        try
-        {
-            await _chatbotModelsRepository.UpdateAsync(entity);
-            return ServiceResult<ChatbotModel>.Success(entity, "ChatbotModel updated successfully");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error updating ChatbotModel");
-            return ServiceResult<ChatbotModel>.Failure($"Error updating ChatbotModel: {e.Message}");
-        }
-    }
-
-    public async Task<ServiceResult<ChatbotModel>> AddWithApiKeysAsync(ChatbotModelCreateDTO dto)
+    private async Task<ServiceResult<ChatbotModel>> CreateInternalAsync(ChatbotModelCreateDTO dto)
     {
         if (dto == null)
         {
@@ -169,7 +163,7 @@ public class ChatbotModelsService : IChatbotModelsService
         }
     }
 
-    public async Task<ServiceResult<ChatbotModel>> UpdateWithApiKeysAsync(ChatbotModelUpdateDTO dto)
+    private async Task<ServiceResult<ChatbotModel>> UpdateInternalAsync(ChatbotModelUpdateDTO dto)
     {
         if (dto == null)
         {
@@ -208,6 +202,60 @@ public class ChatbotModelsService : IChatbotModelsService
         catch (Exception e)
         {
             _logger.LogError(e, "Error updating ChatbotModel with API keys");
+            return ServiceResult<ChatbotModel>.Failure($"Error updating ChatbotModel: {e.Message}");
+        }
+    }
+
+    [Obsolete]
+    public async Task<ServiceResult<ChatbotModel>> AddAsync(ChatbotModel entity)
+    {
+        if (entity == null)
+        {
+            _logger.LogError("ChatbotModel is null");
+            return ServiceResult<ChatbotModel>.Failure("ChatbotModel is null");
+        }
+        
+        if (string.IsNullOrEmpty(entity.ModelName))
+        {
+            _logger.LogError("ChatbotModel name is null or empty");
+            return ServiceResult<ChatbotModel>.Failure("ChatbotModel name is null or empty");
+        }
+
+        try
+        {
+            await _chatbotModelsRepository.AddAsync(entity);
+            return ServiceResult<ChatbotModel>.Success(entity, "ChatbotModel added successfully");
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error adding ChatbotModel");
+            return ServiceResult<ChatbotModel>.Failure($"Error adding ChatbotModel: {e.Message}");
+        }
+    }
+
+    [Obsolete]
+    public async Task<ServiceResult<ChatbotModel>> UpdateAsync(ChatbotModel entity)
+    {
+        if (entity == null)
+        {
+            _logger.LogError("ChatbotModel is null");
+            return ServiceResult<ChatbotModel>.Failure("ChatbotModel is null");
+        }
+        
+        if (string.IsNullOrEmpty(entity.ModelName))
+        {
+            _logger.LogError("ChatbotModel name is null or empty");
+            return ServiceResult<ChatbotModel>.Failure("ChatbotModel name is null or empty");
+        }
+
+        try
+        {
+            await _chatbotModelsRepository.UpdateAsync(entity);
+            return ServiceResult<ChatbotModel>.Success(entity, "ChatbotModel updated successfully");
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error updating ChatbotModel");
             return ServiceResult<ChatbotModel>.Failure($"Error updating ChatbotModel: {e.Message}");
         }
     }

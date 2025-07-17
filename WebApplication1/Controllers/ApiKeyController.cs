@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.DTO;
-using WebApplication1.DTO.ChatbotModel;
-using WebApplication1.Models;
+using WebApplication1.DTO.ApiKey;
 using WebApplication1.Service.Interface;
 
 namespace WebApplication1.Controllers
@@ -65,7 +63,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateApiKey([FromBody] ChatBotApiKey apiKey)
+        public async Task<IActionResult> CreateApiKey([FromBody] ApiKeyCreateDTO apiKeyDto)
         {
             try
             {
@@ -74,9 +72,9 @@ namespace WebApplication1.Controllers
                     return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
                 }
 
-                var result = await _apiKeyService.AddAsync(apiKey);
+                var result = await _apiKeyService.CreateAsync(apiKeyDto);
                 
-                if (result.IsSuccess)
+                if (result.IsSuccess && result.Data != null)
                 {
                     return CreatedAtAction(nameof(GetApiKeyById), new { id = result.Data.ApiKeyId }, 
                         new { success = true, data = result.Data, message = result.Message });
@@ -92,7 +90,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateApiKey(int id, [FromBody] ChatBotApiKey apiKey)
+        public async Task<IActionResult> UpdateApiKey(int id, [FromBody] ApiKeyUpdateDTO apiKeyDto)
         {
             try
             {
@@ -101,12 +99,12 @@ namespace WebApplication1.Controllers
                     return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
                 }
 
-                if (id != apiKey.ApiKeyId)
+                if (id != apiKeyDto.ApiKeyId)
                 {
                     return BadRequest(new { success = false, message = "ID mismatch" });
                 }
 
-                var result = await _apiKeyService.UpdateAsync(apiKey);
+                var result = await _apiKeyService.UpdateAsync(id, apiKeyDto);
                 
                 if (result.IsSuccess)
                 {
@@ -195,6 +193,38 @@ namespace WebApplication1.Controllers
             }
         }
 
+        [HttpPost("model/{modelId}/bulk-create")]
+        public async Task<IActionResult> CreateApiKeysForModelBulk(int modelId, [FromBody] BulkApiKeyCreateDTO bulkCreateDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
+                }
+
+                if (modelId != bulkCreateDto.ChatbotModelId)
+                {
+                    return BadRequest(new { success = false, message = "Model ID mismatch" });
+                }
+
+                var result = await _apiKeyService.CreateApiKeysAsync(modelId, bulkCreateDto.ApiKeys);
+                
+                if (result.IsSuccess)
+                {
+                    return CreatedAtAction(nameof(GetApiKeysByModelId), new { modelId }, 
+                        new { success = true, data = result.Data, message = result.Message });
+                }
+                
+                return BadRequest(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in CreateApiKeysForModelBulk for ModelId {ModelId}", modelId);
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
         [HttpPut("model/{modelId}/update")]
         public async Task<IActionResult> UpdateApiKeysForModel(int modelId, [FromBody] List<ApiKeyUpdateDTO> apiKeyDtos)
         {
@@ -217,6 +247,37 @@ namespace WebApplication1.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in UpdateApiKeysForModel for ModelId {ModelId}", modelId);
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        [HttpPut("model/{modelId}/bulk-update")]
+        public async Task<IActionResult> UpdateApiKeysForModelBulk(int modelId, [FromBody] BulkApiKeyUpdateDTO bulkUpdateDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
+                }
+
+                if (modelId != bulkUpdateDto.ChatbotModelId)
+                {
+                    return BadRequest(new { success = false, message = "Model ID mismatch" });
+                }
+
+                var result = await _apiKeyService.UpdateApiKeysAsync(modelId, bulkUpdateDto.ApiKeys);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(new { success = true, message = result.Message });
+                }
+                
+                return BadRequest(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in UpdateApiKeysForModelBulk for ModelId {ModelId}", modelId);
                 return StatusCode(500, new { success = false, message = "Internal server error" });
             }
         }
@@ -247,16 +308,16 @@ namespace WebApplication1.Controllers
         #region Validation Operations
 
         [HttpPost("validate")]
-        public async Task<IActionResult> ValidateApiKey([FromBody] string apiKeyValue)
+        public async Task<IActionResult> ValidateApiKey([FromBody] ApiKeyValidationDTO validationDto)
         {
             try
             {
-                if (string.IsNullOrEmpty(apiKeyValue))
+                if (!ModelState.IsValid)
                 {
-                    return BadRequest(new { success = false, message = "API key value is required" });
+                    return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
                 }
 
-                var result = await _apiKeyService.ValidateApiKeyAsync(apiKeyValue);
+                var result = await _apiKeyService.ValidateApiKeyAsync(validationDto.ApiKey);
                 
                 if (result.IsSuccess)
                 {
@@ -294,6 +355,58 @@ namespace WebApplication1.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in ValidateApiKeyByParam");
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        [HttpGet("check-unique/{apiKeyValue}")]
+        public async Task<IActionResult> CheckApiKeyUnique(string apiKeyValue, [FromQuery] int? excludeId = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(apiKeyValue))
+                {
+                    return BadRequest(new { success = false, message = "API key value is required" });
+                }
+
+                var result = await _apiKeyService.IsApiKeyUniqueAsync(apiKeyValue, excludeId);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(new { success = true, isUnique = result.Data, message = result.Message });
+                }
+                
+                return BadRequest(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in CheckApiKeyUnique");
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        [HttpGet("model-key/{modelName}")]
+        public async Task<IActionResult> GetApiKeyForModel(string modelName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(modelName))
+                {
+                    return BadRequest(new { success = false, message = "Model name is required" });
+                }
+
+                var result = await _apiKeyService.GetApiKeyForModelAsync(modelName);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(new { success = true, data = result.Data, message = result.Message });
+                }
+                
+                return NotFound(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetApiKeyForModel");
                 return StatusCode(500, new { success = false, message = "Internal server error" });
             }
         }

@@ -1,9 +1,10 @@
-﻿using WebApplication1.DTO;
+using WebApplication1.DTO;
+using WebApplication1.DTO.Conversation;
 using WebApplication1.Models;
 
 namespace WebApplication1.Service.Interface
 {
-    public interface IConversationService : IService<Conversation>
+    public interface IConversationService : IReadService<ConversationResponseDTO>, IWriteService<ConversationCreateDTO, ConversationUpdateDTO, ConversationResponseDTO>
     {
         Task<ServiceResult<Conversation>> StartNewConversationAsync(string userId, bool isPaidUser);
         Task<ServiceResult<IEnumerable<Conversation>>> GetUserConversationsAsync(string userId, bool includeMessages = false);
