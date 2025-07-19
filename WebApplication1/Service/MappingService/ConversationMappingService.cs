@@ -1,7 +1,7 @@
 using WebApplication1.DTO.Conversation;
 using WebApplication1.Models;
 
-namespace WebApplication1.Service
+namespace WebApplication1.Service.MappingService
 {
     public static class ConversationMappingService
     {
