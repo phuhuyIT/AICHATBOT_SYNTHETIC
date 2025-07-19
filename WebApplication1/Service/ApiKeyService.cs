@@ -4,6 +4,7 @@ using WebApplication1.DTO.ChatbotModel;
 using WebApplication1.Models;
 using WebApplication1.Repository.Interface;
 using WebApplication1.Service.Interface;
+using WebApplication1.Service.MappingService;
 using ApiKeyCreateDTO = WebApplication1.DTO.ApiKey.ApiKeyCreateDTO;
 
 namespace WebApplication1.Service
