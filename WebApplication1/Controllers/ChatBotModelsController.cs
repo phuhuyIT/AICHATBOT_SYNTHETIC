@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Models;
 using WebApplication1.Service.Interface;
 using WebApplication1.DTO.ChatbotModel;
 
@@ -10,74 +9,180 @@ namespace WebApplication1.Controllers;
 public class ChatBotModelsController : ControllerBase
 {
     private readonly IChatbotModelsService _chatbotService;
+    private readonly ILogger<ChatBotModelsController> _logger;
 
-    public ChatBotModelsController(IChatbotModelsService chatbotService)
+    public ChatBotModelsController(IChatbotModelsService chatbotService, ILogger<ChatBotModelsController> logger)
     {
         _chatbotService = chatbotService;
+        _logger = logger;
     }
 
+    #region CRUD Operations
+
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAllModels()
     {
-        var result = await _chatbotService.GetAllAsync();
-        
-        if (result.IsSuccess)
-            return Ok(new { success = true, message = result.Message, data = result.Data });
-        
-        return BadRequest(new { success = false, message = result.Message });
+        try
+        {
+            var result = await _chatbotService.GetAllAsync();
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetAllModels");
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(int id)
+    public async Task<IActionResult> GetModelById(Guid id)
     {
-        var result = await _chatbotService.GetByIdAsync(id);
-        
-        if (result.IsSuccess)
-            return Ok(new { success = true, message = result.Message, data = result.Data });
-        
-        return NotFound(new { success = false, message = result.Message });
+        try
+        {
+            var result = await _chatbotService.GetByIdAsync(id);
+            
+            if (result.IsSuccess)
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            
+            return NotFound(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetModelById for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] ChatbotModelCreateDTO model)
+    public async Task<IActionResult> CreateModel([FromBody] ChatbotModelCreateDTO modelDto)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(new { success = false, message = "Invalid model data", errors = ModelState });
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
+            }
 
-        var result = await _chatbotService.CreateAsync(model);
-        
-        if (result.IsSuccess)
-            return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, 
-                new { success = true, message = result.Message, data = result.Data });
-        
-        return BadRequest(new { success = false, message = result.Message });
+            var result = await _chatbotService.CreateAsync(modelDto);
+            
+            if (result.IsSuccess && result.Data != null)
+            {
+                return CreatedAtAction(nameof(GetModelById), new { id = result.Data.Id }, 
+                    new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in CreateModel");
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] ChatbotModelUpdateDTO model)
+    public async Task<IActionResult> UpdateModel(Guid id, [FromBody] ChatbotModelUpdateDTO modelDto)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(new { success = false, message = "Invalid model data", errors = ModelState });
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
+            }
 
-        if (id != model.Id)
-            return BadRequest(new { success = false, message = "ID mismatch" });
+            if (id != modelDto.Id)
+            {
+                return BadRequest(new { success = false, message = "ID mismatch" });
+            }
 
-        var result = await _chatbotService.UpdateAsync(id, model);
-        
-        if (result.IsSuccess)
-            return Ok(new { success = true, message = result.Message, data = result.Data });
-        
-        return BadRequest(new { success = false, message = result.Message });
+            var result = await _chatbotService.UpdateAsync(id, modelDto);
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in UpdateModel for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteModel(Guid id)
     {
-        var result = await _chatbotService.DeleteAsync(id);
-        
-        if (result.IsSuccess)
-            return Ok(new { success = true, message = result.Message });
-        
-        return NotFound(new { success = false, message = result.Message });
+        try
+        {
+            var result = await _chatbotService.DeleteAsync(id);
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, message = result.Message });
+            }
+            
+            return NotFound(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in DeleteModel for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
     }
+
+    #endregion
+
+    #region Additional Operations
+
+    [HttpGet("available")]
+    public async Task<IActionResult> GetAvailableModels()
+    {
+        try
+        {
+            var result = await _chatbotService.GetAllAsync();
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetAvailableModels");
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    [HttpGet("paid-user-models")]
+    public async Task<IActionResult> GetPaidUserModels()
+    {
+        try
+        {
+            var result = await _chatbotService.GetPaidChatbotModel();
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetPaidUserModels");
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    #endregion
 }
