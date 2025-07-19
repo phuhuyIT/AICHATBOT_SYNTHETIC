@@ -3,6 +3,7 @@ using WebApplication1.DTO.Conversation;
 using WebApplication1.Models;
 using WebApplication1.Repository.Interface;
 using WebApplication1.Service.Interface;
+using WebApplication1.Service.MappingService;
 
 namespace WebApplication1.Service
 {
@@ -43,11 +44,11 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<IEnumerable<Conversation>>> GetUserConversationsAsync(string userId, bool includeMessages = false)
+        public async Task<ServiceResult<IEnumerable<Conversation>>> GetUserConversationsAsync(string userId, bool includeBranches = false)
         {
             try
             {
-                var conversations = await _unitOfWork.ConversationRepository.GetUserConversationsAsync(userId, includeMessages);
+                var conversations = await _unitOfWork.ConversationRepository.GetUserConversationsAsync(userId, includeBranches);
                 return ServiceResult<IEnumerable<Conversation>>.Success(conversations);
             }
             catch (Exception ex)
@@ -57,7 +58,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<Conversation>> GetConversationWithMessagesAsync(int conversationId, string userId)
+        public async Task<ServiceResult<Conversation>> GetConversationWithBranchesAsync(Guid conversationId, string userId)
         {
             try
             {
@@ -68,7 +69,7 @@ namespace WebApplication1.Service
                     return ServiceResult<Conversation>.Failure("Access denied to conversation");
                 }
 
-                var conversation = await _unitOfWork.ConversationRepository.GetConversationWithMessagesAsync(conversationId);
+                var conversation = await _unitOfWork.ConversationRepository.GetConversationWithBranchesAsync(conversationId);
                 if (conversation == null)
                 {
                     return ServiceResult<Conversation>.Failure("Conversation not found");
@@ -83,7 +84,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<bool>> EndConversationAsync(int conversationId, string userId)
+        public async Task<ServiceResult<bool>> EndConversationAsync(Guid conversationId, string userId)
         {
             try
             {
@@ -131,7 +132,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<bool>> ValidateConversationAccessAsync(int conversationId, string userId)
+        public async Task<ServiceResult<bool>> ValidateConversationAccessAsync(Guid conversationId, string userId)
         {
             try
             {
@@ -165,7 +166,7 @@ namespace WebApplication1.Service
         }
         
 
-        public async Task<ServiceResult<ConversationResponseDTO>> UpdateAsync(int id, ConversationUpdateDTO updateDto)
+        public async Task<ServiceResult<ConversationResponseDTO>> UpdateAsync(Guid id, ConversationUpdateDTO updateDto)
         {
             try
             {
@@ -201,7 +202,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<ConversationResponseDTO>> GetByIdAsync(int id)
+        public async Task<ServiceResult<ConversationResponseDTO>> GetByIdAsync(Guid id)
         {
             try
             {
@@ -226,7 +227,7 @@ namespace WebApplication1.Service
 
         // ---- Legacy entity-based CRUD methods kept for backward compatibility ----
 
-        public async Task<ServiceResult<bool>> DeleteAsync(int id)
+        public async Task<ServiceResult<bool>> DeleteAsync(Guid id)
         {
             try
             {

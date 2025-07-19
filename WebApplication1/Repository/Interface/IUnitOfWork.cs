@@ -5,6 +5,7 @@ namespace WebApplication1.Repository.Interface
     public interface IUnitOfWork : IDisposable
     {
         IConversationRepository ConversationRepository { get; }
+        IConversationBranchRepository ConversationBranchRepository { get; }
         IMessageRepository MessageRepository { get; }
         IGenericRepository<ChatbotModel> ChatbotModelsRepository { get; }
         ITemplateRepository TemplateRepository { get; }

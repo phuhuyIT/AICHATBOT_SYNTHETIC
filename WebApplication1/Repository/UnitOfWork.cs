@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using WebApplication1.Data;
 using WebApplication1.Models;
@@ -13,18 +13,21 @@ namespace WebApplication1.Repository
         private bool _disposed = false;
 
         private IConversationRepository? _conversationRepository;
+        private IConversationBranchRepository? _conversationBranchRepository;
         private IMessageRepository? _messageRepository;
         private IChatbotModelsRepository? _chatbotModelsRepository;
         private ITemplateRepository? _templateRepository;
 
         public UnitOfWork(ApplicationDbContext context,
             IConversationRepository conversationRepository,
+            IConversationBranchRepository conversationBranchRepository,
             IMessageRepository messageRepository,
             IChatbotModelsRepository chatbotModelsRepository,
             ITemplateRepository templateRepository)
         {
             _context = context;
             _conversationRepository = conversationRepository;
+            _conversationBranchRepository = conversationBranchRepository;
             _messageRepository = messageRepository;
             _chatbotModelsRepository = chatbotModelsRepository;
             _templateRepository = templateRepository;
@@ -32,6 +35,9 @@ namespace WebApplication1.Repository
 
         public IConversationRepository ConversationRepository => _conversationRepository ??= 
             new ConversationRepository(_context);
+
+        public IConversationBranchRepository ConversationBranchRepository => _conversationBranchRepository ??= 
+            new ConversationBranchRepository(_context);
 
         public IMessageRepository MessageRepository => _messageRepository ??= 
             new MessageRepository(_context);

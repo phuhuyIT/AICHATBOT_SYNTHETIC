@@ -55,11 +55,11 @@ namespace WebApplication1.Controllers
                 var response = new SendMessageResponse
                 {
                     MessageId = messageResult.Data.MessageId,
-                    UserMessage = messageResult.Data.UserMessage,
-                    AiResponse = messageResult.Data.AiResponse,
+                    UserMessage = request.UserMessage, // Use request data since it's the user input
+                    AiResponse = messageResult.Data.Content, // Use Content property from new model
                     ModelUsed = messageResult.Data.ModelUsed ?? "",
-                    MessageTimestamp = messageResult.Data.MessageTimestamp,
-                    ConversationId = messageResult.Data.ConversationId ?? 0
+                    MessageTimestamp = messageResult.Data.CreatedAt, // Use CreatedAt instead of MessageTimestamp
+                    ConversationId = conversationId
                 };
 
                 return Ok(ServiceResult<SendMessageResponse>.Success(response));
@@ -75,7 +75,7 @@ namespace WebApplication1.Controllers
         /// Get conversation history
         /// </summary>
         [HttpGet("conversation/{conversationId}/messages")]
-        public async Task<IActionResult> GetConversationMessages(int conversationId)
+        public async Task<IActionResult> GetConversationMessages(Guid conversationId)
         {
             try
             {
@@ -94,10 +94,10 @@ namespace WebApplication1.Controllers
                 var messageHistory = messagesResult.Data.Select(m => new MessageHistory
                 {
                     MessageId = m.MessageId,
-                    UserMessage = m.UserMessage,
-                    AiResponse = m.AiResponse,
+                    UserMessage = m.Role == "user" ? m.Content : "", // Extract user content from Role/Content structure
+                    AiResponse = m.Role == "assistant" ? m.Content : "", // Extract AI content from Role/Content structure
                     ModelUsed = m.ModelUsed ?? "",
-                    MessageTimestamp = m.MessageTimestamp
+                    MessageTimestamp = m.CreatedAt // Use CreatedAt instead of MessageTimestamp
                 }).ToList();
 
                 return Ok(ServiceResult<IEnumerable<MessageHistory>>.Success(messageHistory));
@@ -112,8 +112,8 @@ namespace WebApplication1.Controllers
         /// <summary>
         /// Get paginated conversation messages
         /// </summary>
-        [HttpGet("conversation/{conversationId}/messages/paginated")]
-        public async Task<IActionResult> GetPaginatedMessages(int conversationId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
+        [HttpGet("branch/{branchId}/messages/paginated")]
+        public async Task<IActionResult> GetPaginatedMessages(Guid branchId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
         {
             try
             {
@@ -128,7 +128,7 @@ namespace WebApplication1.Controllers
                     return BadRequest("Invalid pagination parameters");
                 }
 
-                var messagesResult = await _chatService.GetPaginatedMessagesAsync(conversationId, userId, pageNumber, pageSize);
+                var messagesResult = await _chatService.GetPaginatedMessagesAsync(branchId, userId, pageNumber, pageSize);
                 if (!messagesResult.IsSuccess)
                 {
                     return BadRequest(messagesResult.Message);
@@ -137,10 +137,10 @@ namespace WebApplication1.Controllers
                 var messageHistory = messagesResult.Data.Select(m => new MessageHistory
                 {
                     MessageId = m.MessageId,
-                    UserMessage = m.UserMessage,
-                    AiResponse = m.AiResponse,
+                    UserMessage = m.Role == "user" ? m.Content : "",
+                    AiResponse = m.Role == "assistant" ? m.Content : "",
                     ModelUsed = m.ModelUsed ?? "",
-                    MessageTimestamp = m.MessageTimestamp
+                    MessageTimestamp = m.CreatedAt
                 }).ToList();
 
                 return Ok(ServiceResult<IEnumerable<MessageHistory>>.Success(messageHistory));
@@ -156,7 +156,7 @@ namespace WebApplication1.Controllers
         /// Get user's conversations
         /// </summary>
         [HttpGet("conversations")]
-        public async Task<IActionResult> GetUserConversations([FromQuery] bool includeMessages = false)
+        public async Task<IActionResult> GetUserConversations([FromQuery] bool includeBranches = false)
         {
             try
             {
@@ -166,7 +166,7 @@ namespace WebApplication1.Controllers
                     return Unauthorized("User not authenticated");
                 }
 
-                var conversationsResult = await _conversationService.GetUserConversationsAsync(userId, includeMessages);
+                var conversationsResult = await _conversationService.GetUserConversationsAsync(userId, includeBranches);
                 if (!conversationsResult.IsSuccess)
                 {
                     return BadRequest(conversationsResult.Message);
@@ -178,8 +178,10 @@ namespace WebApplication1.Controllers
                     ConversationId = c.ConversationId,
                     StartedAt = c.StartedAt,
                     EndedAt = c.EndedAt,
-                    MessageCount = c.Messages?.Count() ?? 0,
-                    LastMessage = c.Messages?.LastOrDefault()?.UserMessage,
+                    MessageCount = c.Branches?.SelectMany(b => b.Messages).Count() ?? 0, // Count messages from all branches
+                    LastMessage = c.Branches?.SelectMany(b => b.Messages)
+                        .OrderByDescending(m => m.CreatedAt)
+                        .FirstOrDefault()?.Content, // Get last message content
                     IsActive = c.IsActive
                 }).ToList();
 
@@ -225,7 +227,7 @@ namespace WebApplication1.Controllers
         /// End a conversation
         /// </summary>
         [HttpPost("conversations/{conversationId}/end")]
-        public async Task<IActionResult> EndConversation(int conversationId)
+        public async Task<IActionResult> EndConversation(Guid conversationId)
         {
             try
             {
@@ -254,7 +256,7 @@ namespace WebApplication1.Controllers
         /// Delete a message
         /// </summary>
         [HttpDelete("messages/{messageId}")]
-        public async Task<IActionResult> DeleteMessage(int messageId)
+        public async Task<IActionResult> DeleteMessage(Guid messageId)
         {
             try
             {
@@ -283,7 +285,7 @@ namespace WebApplication1.Controllers
         /// Regenerate AI response for a message
         /// </summary>
         [HttpPost("messages/{messageId}/regenerate")]
-        public async Task<IActionResult> RegenerateResponse(int messageId, [FromBody] RegenerateResponseRequest request)
+        public async Task<IActionResult> RegenerateResponse(Guid messageId, [FromBody] RegenerateResponseRequest request)
         {
             try
             {
@@ -307,11 +309,11 @@ namespace WebApplication1.Controllers
                 var response = new SendMessageResponse
                 {
                     MessageId = result.Data.MessageId,
-                    UserMessage = result.Data.UserMessage,
-                    AiResponse = result.Data.AiResponse,
+                    UserMessage = result.Data.Role == "user" ? result.Data.Content : "", // Extract from Role/Content
+                    AiResponse = result.Data.Role == "assistant" ? result.Data.Content : "", // Extract from Role/Content
                     ModelUsed = result.Data.ModelUsed ?? string.Empty,
-                    MessageTimestamp = result.Data.MessageTimestamp,
-                    ConversationId = result.Data.ConversationId ?? 0
+                    MessageTimestamp = result.Data.CreatedAt, // Use CreatedAt
+                    ConversationId = Guid.Empty // Will need to get from branch if needed
                 };
 
                 return Ok(ServiceResult<SendMessageResponse>.Success(response));

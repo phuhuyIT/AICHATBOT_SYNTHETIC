@@ -11,25 +11,25 @@ namespace WebApplication1.Repository
         {
         }
 
-        public virtual async Task<IEnumerable<Conversation>> GetUserConversationsAsync(string userId, bool includeMessages = false)
+        public virtual async Task<IEnumerable<Conversation>> GetUserConversationsAsync(string userId, bool includeBranches = false)
         {
             var query = _dbSet.AsNoTracking().Where(c => c.UserId == userId && c.IsActive);
 
-            if (includeMessages)
+            if (includeBranches)
             {
-                query = query.Include(c => c.Messages.Where(m => m.IsActive))
-                           .ThenInclude(m => m.ModifiedMessages);
+                query = query.Include(c => c.Branches)
+                           .ThenInclude(b => b.Messages);
             }
 
             return await query.OrderByDescending(c => c.StartedAt).ToListAsync();
         }
 
-        public virtual async Task<Conversation?> GetConversationWithMessagesAsync(int conversationId)
+        public virtual async Task<Conversation?> GetConversationWithBranchesAsync(Guid conversationId)
         {
             return await _dbSet
                 .AsNoTracking()
-                .Include(c => c.Messages.Where(m => m.IsActive))
-                .ThenInclude(m => m.ModifiedMessages)
+                .Include(c => c.Branches)
+                .ThenInclude(b => b.Messages)
                 .Include(c => c.User)
                 .FirstOrDefaultAsync(c => c.ConversationId == conversationId && c.IsActive);
         }
@@ -43,7 +43,7 @@ namespace WebApplication1.Repository
                 .ToListAsync();
         }
 
-        public virtual async Task<bool> DeactivateConversationAsync(int conversationId)
+        public virtual async Task<bool> DeactivateConversationAsync(Guid conversationId)
         {
             var conversation = await _dbSet.FindAsync(conversationId);
             if (conversation == null) return false;
@@ -52,7 +52,7 @@ namespace WebApplication1.Repository
             conversation.EndedAt = DateTime.UtcNow;
             conversation.UpdatedAt = DateTime.UtcNow;
 
-            return true;
+            return await _context.SaveChangesAsync() > 0;
         }
 
         public virtual async Task<Conversation?> GetLatestConversationAsync(string userId)
@@ -64,7 +64,7 @@ namespace WebApplication1.Repository
                 .FirstOrDefaultAsync();
         }
 
-        public virtual async Task<bool> IsConversationOwnedByUserAsync(int conversationId, string userId)
+        public virtual async Task<bool> IsConversationOwnedByUserAsync(Guid conversationId, string userId)
         {
             return await _dbSet
                 .AsNoTracking()
@@ -72,21 +72,20 @@ namespace WebApplication1.Repository
         }
 
         public virtual async Task<IEnumerable<Conversation>> GetPaginatedUserConversationsAsync(
-            string userId, int pageNumber, int pageSize, bool includeMessages = false)
+            string userId, int pageNumber, int pageSize, bool includeBranches = false)
         {
             var query = _dbSet.AsNoTracking().Where(c => c.UserId == userId && c.IsActive);
 
-            if (includeMessages)
+            if (includeBranches)
             {
-                query = query.Include(c => c.Messages.Where(m => m.IsActive))
-                           .ThenInclude(m => m.ModifiedMessages);
+                query = query.Include(c => c.Branches)
+                           .ThenInclude(b => b.Messages);
             }
 
-            return await query
-                .OrderByDescending(c => c.StartedAt)
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+            return await query.OrderByDescending(c => c.StartedAt)
+                             .Skip((pageNumber - 1) * pageSize)
+                             .Take(pageSize)
+                             .ToListAsync();
         }
 
         public virtual async Task<int> GetUserConversationCountAsync(string userId)

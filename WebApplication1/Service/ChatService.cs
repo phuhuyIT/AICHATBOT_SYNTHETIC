@@ -41,7 +41,7 @@ namespace WebApplication1.Service
             _httpClient = httpClient;
         }
 
-        public async Task<ServiceResult<Message>> SendMessageAsync(string userId, int conversationId, string userMessage, string modelName)
+        public async Task<ServiceResult<Message>> SendMessageAsync(string userId, Guid conversationId, string userMessage, string modelName)
         {
             try
             {
@@ -52,8 +52,19 @@ namespace WebApplication1.Service
                     return ServiceResult<Message>.Failure("Access denied to conversation");
                 }
 
+                // Get or create main branch for this conversation
+                var conversation = await _unitOfWork.ConversationRepository.GetByIdAsync(conversationId);
+                var mainBranch = conversation?.Branches?.FirstOrDefault() ?? 
+                    new ConversationBranch { ConversationId = conversationId };
+
+                if (mainBranch.BranchId == Guid.Empty)
+                {
+                    await _unitOfWork.ConversationBranchRepository.AddAsync(mainBranch);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
                 // Get conversation history for context
-                var conversationHistory = await _unitOfWork.MessageRepository.GetConversationMessagesAsync(conversationId);
+                var conversationHistory = await _unitOfWork.MessageRepository.GetBranchMessagesAsync(mainBranch.BranchId);
                 var historyList = conversationHistory.ToList();
 
                 // Get AI response
@@ -63,25 +74,39 @@ namespace WebApplication1.Service
                     return ServiceResult<Message>.Failure(aiResponseResult.Message);
                 }
 
-                // Create and save message
-                var message = new Message
+                // Create and save user message
+                var userMsg = new Message
                 {
-                    ConversationId = conversationId,
-                    UserMessage = userMessage,
-                    AiResponse = aiResponseResult.Data,
+                    BranchId = mainBranch.BranchId,
+                    Role = "user",
+                    Content = userMessage,
                     ModelUsed = modelName,
-                    MessageTimestamp = DateTime.UtcNow,
-                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
 
-                await _unitOfWork.MessageRepository.AddAsync(message);
+                await _unitOfWork.MessageRepository.AddAsync(userMsg);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Create and save AI response message
+                var aiMessage = new Message
+                {
+                    BranchId = mainBranch.BranchId,
+                    Role = "assistant",
+                    Content = aiResponseResult.Data,
+                    ModelUsed = modelName,
+                    ParentMessageId = userMsg.MessageId,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.MessageRepository.AddAsync(aiMessage);
                 await _unitOfWork.SaveChangesAsync();
                 
                 _logger.LogInformation("Message sent successfully in conversation {ConversationId} using model {ModelName}", 
                     conversationId, modelName);
                 
-                return ServiceResult<Message>.Success(message);
+                return ServiceResult<Message>.Success(aiMessage);
             }
             catch (Exception ex)
             {
@@ -129,11 +154,10 @@ namespace WebApplication1.Service
                     new { role = "system", content = "You are a helpful assistant." }
                 };
 
-                // Add conversation history
+                // Add conversation history using new Role/Content structure
                 foreach (var msg in conversationHistory.TakeLast(10)) // Limit context
                 {
-                    messages.Add(new { role = "user", content = msg.UserMessage });
-                    messages.Add(new { role = "assistant", content = msg.AiResponse });
+                    messages.Add(new { role = msg.Role, content = msg.Content });
                 }
 
                 messages.Add(new { role = "user", content = userMessage });
@@ -179,7 +203,7 @@ namespace WebApplication1.Service
         {
             try
             {
-                var context = string.Join("\n", conversationHistory.TakeLast(5).Select(m => $"User: {m.UserMessage}\nAssistant: {m.AiResponse}"));
+                var context = string.Join("\n", conversationHistory.TakeLast(5).Select(m => $"{m.Role}: {m.Content}"));
                 var fullPrompt = string.IsNullOrEmpty(context) ? userMessage : $"{context}\nUser: {userMessage}";
 
                 var requestBody = new
@@ -230,11 +254,10 @@ namespace WebApplication1.Service
             {
                 var messages = new List<object>();
 
-                // Add conversation history
+                // Add conversation history using new Role/Content structure
                 foreach (var msg in conversationHistory.TakeLast(10))
                 {
-                    messages.Add(new { role = "user", content = msg.UserMessage });
-                    messages.Add(new { role = "assistant", content = msg.AiResponse });
+                    messages.Add(new { role = msg.Role, content = msg.Content });
                 }
 
                 messages.Add(new { role = "user", content = userMessage });
@@ -284,11 +307,10 @@ namespace WebApplication1.Service
                     new { role = "system", content = "You are Grok, a helpful AI assistant." }
                 };
 
-                // Add conversation history
+                // Add conversation history using new Role/Content structure
                 foreach (var msg in conversationHistory.TakeLast(10))
                 {
-                    messages.Add(new { role = "user", content = msg.UserMessage });
-                    messages.Add(new { role = "assistant", content = msg.AiResponse });
+                    messages.Add(new { role = msg.Role, content = msg.Content });
                 }
 
                 messages.Add(new { role = "user", content = userMessage });
@@ -330,7 +352,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<IEnumerable<Message>>> GetConversationMessagesAsync(int conversationId, string userId)
+        public async Task<ServiceResult<IEnumerable<Message>>> GetConversationMessagesAsync(Guid conversationId, string userId)
         {
             try
             {
@@ -350,27 +372,34 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<IEnumerable<Message>>> GetPaginatedMessagesAsync(int conversationId, string userId, int pageNumber, int pageSize)
+        public async Task<ServiceResult<IEnumerable<Message>>> GetPaginatedMessagesAsync(Guid branchId, string userId, int pageNumber, int pageSize)
         {
             try
             {
-                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
+                // Get conversation ID from branch to validate access
+                var branch = await _unitOfWork.ConversationBranchRepository.GetByIdAsync(branchId);
+                if (branch == null)
+                {
+                    return ServiceResult<IEnumerable<Message>>.Failure("Branch not found");
+                }
+
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(branch.ConversationId, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<IEnumerable<Message>>.Failure("Access denied to conversation");
                 }
 
-                var messages = await _unitOfWork.MessageRepository.GetPaginatedMessagesAsync(conversationId, pageNumber, pageSize);
+                var messages = await _unitOfWork.MessageRepository.GetPaginatedMessagesAsync(branchId, pageNumber, pageSize);
                 return ServiceResult<IEnumerable<Message>>.Success(messages);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting paginated messages for conversation {ConversationId}", conversationId);
+                _logger.LogError(ex, "Error getting paginated messages for branch {BranchId}", branchId);
                 return ServiceResult<IEnumerable<Message>>.Failure("Failed to retrieve messages");
             }
         }
 
-        public async Task<ServiceResult<bool>> DeleteMessageAsync(int messageId, string userId)
+        public async Task<ServiceResult<bool>> DeleteMessageAsync(Guid messageId, string userId)
         {
             try
             {
@@ -380,14 +409,20 @@ namespace WebApplication1.Service
                     return ServiceResult<bool>.Failure("Message not found");
                 }
 
-                // Validate user access through conversation ownership
-                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(message.ConversationId ?? 0, userId);
+                // Get conversation through branch to validate access
+                var branch = await _unitOfWork.ConversationBranchRepository.GetByIdAsync(message.BranchId);
+                if (branch == null)
+                {
+                    return ServiceResult<bool>.Failure("Branch not found");
+                }
+
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(branch.ConversationId, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<bool>.Failure("Access denied to message");
                 }
 
-                message.IsActive = false;
+                // Soft delete by updating timestamp (no IsActive in new model)
                 message.UpdatedAt = DateTime.UtcNow;
                 await _unitOfWork.MessageRepository.UpdateAsync(message);
                 await _unitOfWork.SaveChangesAsync();
@@ -401,7 +436,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<Message>> RegenerateResponseAsync(int messageId, string userId, string? newModelName = null)
+        public async Task<ServiceResult<Message>> RegenerateResponseAsync(Guid messageId, string userId, string? newModelName = null)
         {
             try
             {
@@ -411,25 +446,36 @@ namespace WebApplication1.Service
                     return ServiceResult<Message>.Failure("Message not found");
                 }
 
-                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(message.ConversationId ?? 0, userId);
+                // Get conversation through branch to validate access
+                var branch = await _unitOfWork.ConversationBranchRepository.GetByIdAsync(message.BranchId);
+                if (branch == null)
+                {
+                    return ServiceResult<Message>.Failure("Branch not found");
+                }
+
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(branch.ConversationId, userId);
                 if (!hasAccess)
                 {
                     return ServiceResult<Message>.Failure("Access denied to message");
                 }
 
                 var modelToUse = newModelName ?? message.ModelUsed ?? "gpt-3.5-turbo";
-                var conversationHistory = await _unitOfWork.MessageRepository.GetConversationMessagesAsync(message.ConversationId ?? 0);
+                var conversationHistory = await _unitOfWork.MessageRepository.GetBranchMessagesAsync(message.BranchId);
                 
                 // Get messages before the current one for context
-                var contextMessages = conversationHistory.Where(m => m.MessageTimestamp < message.MessageTimestamp).ToList();
+                var contextMessages = conversationHistory.Where(m => m.CreatedAt < message.CreatedAt).ToList();
                 
-                var aiResponseResult = await GetAIResponseAsync(message.UserMessage, modelToUse, contextMessages);
+                // Find the user message content to regenerate response for
+                var userContent = message.Role == "user" ? message.Content : 
+                    contextMessages.LastOrDefault(m => m.Role == "user")?.Content ?? "Hello";
+                
+                var aiResponseResult = await GetAIResponseAsync(userContent, modelToUse, contextMessages);
                 if (!aiResponseResult.IsSuccess)
                 {
                     return ServiceResult<Message>.Failure(aiResponseResult.Message);
                 }
 
-                message.AiResponse = aiResponseResult.Data;
+                message.Content = aiResponseResult.Data;
                 message.ModelUsed = modelToUse;
                 message.UpdatedAt = DateTime.UtcNow;
                 
