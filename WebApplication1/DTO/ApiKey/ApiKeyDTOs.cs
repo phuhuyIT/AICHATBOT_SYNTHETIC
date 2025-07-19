@@ -20,7 +20,7 @@ namespace WebApplication1.DTO.ApiKey
         public string Usage { get; set; } = null!;
 
         [Required]
-        public int ChatbotModelId { get; set; }
+        public Guid ChatbotModelId { get; set; }
 
         public bool IsActive { get; set; } = true;
 
@@ -30,7 +30,7 @@ namespace WebApplication1.DTO.ApiKey
     public class ApiKeyUpdateDTO
     {
         [Required]
-        public int ApiKeyId { get; set; }
+        public Guid ApiKeyId { get; set; }
 
         [Required]
         [StringLength(500, ErrorMessage = "API key cannot exceed 500 characters")]
@@ -48,7 +48,7 @@ namespace WebApplication1.DTO.ApiKey
         public string Usage { get; set; } = null!;
 
         [Required]
-        public int ChatbotModelId { get; set; }
+        public Guid ChatbotModelId { get; set; }
 
         public bool IsActive { get; set; } = true;
 
@@ -57,14 +57,14 @@ namespace WebApplication1.DTO.ApiKey
 
     public class ApiKeyResponseDTO
     {
-        public int ApiKeyId { get; set; }
+        public Guid ApiKeyId { get; set; }
         public string? UserId { get; set; }
         public string ApiKey { get; set; } = null!;
         public string ServiceName { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
         public string? Setting { get; set; }
         public string Usage { get; set; } = null!;
-        public int ChatbotModelId { get; set; }
+        public Guid ChatbotModelId { get; set; }
         public bool IsActive { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public string? ChatbotModelName { get; set; }
@@ -80,7 +80,7 @@ namespace WebApplication1.DTO.ApiKey
 
     public class ApiKeyListDTO
     {
-        public int ApiKeyId { get; set; }
+        public Guid ApiKeyId { get; set; }
         public string ApiKey { get; set; } = null!;
         public string ServiceName { get; set; } = null!;
         public bool IsActive { get; set; }
@@ -92,7 +92,7 @@ namespace WebApplication1.DTO.ApiKey
     public class BulkApiKeyCreateDTO
     {
         [Required]
-        public int ChatbotModelId { get; set; }
+        public Guid ChatbotModelId { get; set; }
 
         [Required]
         [MinLength(1, ErrorMessage = "At least one API key is required")]
@@ -102,7 +102,7 @@ namespace WebApplication1.DTO.ApiKey
     public class BulkApiKeyUpdateDTO
     {
         [Required]
-        public int ChatbotModelId { get; set; }
+        public Guid ChatbotModelId { get; set; }
 
         [Required]
         [MinLength(1, ErrorMessage = "At least one API key is required")]

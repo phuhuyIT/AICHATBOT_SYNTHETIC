@@ -8,7 +8,8 @@ namespace WebApplication1.Models;
 public partial class ChatBotApiKey
 {
     [Key]
-    public int ApiKeyId { get; set; }
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public Guid ApiKeyId { get; set; }
 
     public string? UserId { get; set; }
 
@@ -23,7 +24,7 @@ public partial class ChatBotApiKey
     public string Usage { get; set; } = null!;
     
     [ForeignKey("ChatbotModel")]
-    public int ChatbotModelId { get; set; }
+    public Guid ChatbotModelId { get; set; }
 
     public bool IsActive { get; set; } = true;
 

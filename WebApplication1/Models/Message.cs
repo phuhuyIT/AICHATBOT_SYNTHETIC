@@ -1,29 +1,43 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication1.Models;
 
 public partial class Message
 {
     [Key]
-    public int MessageId { get; set; }
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public Guid MessageId { get; set; }
 
-    public int? ConversationId { get; set; }
+    [ForeignKey(nameof(Branch))]
+    public Guid BranchId { get; set; }
+    public virtual ConversationBranch Branch { get; set; } = null!;
 
-    public string UserMessage { get; set; } = null!;
+    // optional pointer to previous message inside the same branch
+    public Guid? ParentMessageId { get; set; }
+    public virtual Message? ParentMessage { get; set; }
 
-    public string AiResponse { get; set; } = null!;
+    // user / assistant / system
+    [MaxLength(10)]
+    public string Role { get; set; } = "user";
+
+    [Required]
+    public string Content { get; set; } = string.Empty;
 
     public string? ModelUsed { get; set; }
 
-    public DateTime MessageTimestamp { get; set; }
+    // token count for sliding‑window logic
+    public int Tokens { get; set; }
 
-    public bool IsActive { get; set; } = true;
+    // optional embedding for RAG (OpenAI 1536‑float → byte[] serialized)
+    [Column(TypeName = "varbinary(max)")]
+    public byte[]? Embedding { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    public virtual Conversation? Conversation { get; set; }
-
-    public virtual ICollection<ModifiedMessage> ModifiedMessages { get; set; } = new List<ModifiedMessage>();
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }

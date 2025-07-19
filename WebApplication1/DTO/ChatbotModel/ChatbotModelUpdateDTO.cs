@@ -6,7 +6,7 @@ namespace WebApplication1.DTO.ChatbotModel
     public class ChatbotModelUpdateDTO
     {
         [Required]
-        public int Id { get; set; }
+        public Guid Id { get; set; }
         
         [Required]
         public string ModelName { get; set; } = null!;
@@ -19,4 +19,3 @@ namespace WebApplication1.DTO.ChatbotModel
     }
     
 }
-

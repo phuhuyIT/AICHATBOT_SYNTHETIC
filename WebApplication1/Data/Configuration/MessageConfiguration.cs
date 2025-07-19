@@ -9,20 +9,23 @@ namespace WebApplication1.Data.Configuration
         public void Configure(EntityTypeBuilder<Message> builder)
         {
             // Add indexes for frequently queried columns
-            builder.HasIndex(m => m.ConversationId)
-                .HasDatabaseName("IX_Messages_ConversationId");
+            builder.HasIndex(m => m.BranchId)
+                .HasDatabaseName("IX_Messages_BranchId");
                 
-            builder.HasIndex(m => m.IsActive)
-                .HasDatabaseName("IX_Messages_IsActive");
+            builder.HasIndex(m => m.Role)
+                .HasDatabaseName("IX_Messages_Role");
                 
-            builder.HasIndex(m => new { m.ConversationId, m.IsActive })
-                .HasDatabaseName("IX_Messages_ConversationId_IsActive");
+            builder.HasIndex(m => new { m.BranchId, m.Role })
+                .HasDatabaseName("IX_Messages_BranchId_Role");
                 
-            builder.HasIndex(m => m.MessageTimestamp)
-                .HasDatabaseName("IX_Messages_MessageTimestamp");
-                
+            builder.HasIndex(m => m.CreatedAt)
+                .HasDatabaseName("IX_Messages_CreatedAt");
+
             builder.HasIndex(m => m.ModelUsed)
                 .HasDatabaseName("IX_Messages_ModelUsed");
+
+            builder.HasIndex(m => m.ParentMessageId)
+                .HasDatabaseName("IX_Messages_ParentMessageId");
         }
     }
 }
