@@ -21,7 +21,7 @@ namespace WebApplication1.Repository
             // Removed SaveChangesAsync - will be handled by Unit of Work
         }
 
-        public virtual async Task<bool> DeleteAsync(int id)
+        public virtual async Task<bool> DeleteAsync(Guid id)
         {
             var entity = await _dbSet.FindAsync(id);
             if (entity == null)
@@ -37,7 +37,7 @@ namespace WebApplication1.Repository
             return await _dbSet.AsNoTracking().ToListAsync();
         }
 
-        public virtual async Task<T?> GetByIdAsync(int id)
+        public virtual async Task<T?> GetByIdAsync(Guid id)
         {
             return await _dbSet.FindAsync(id);
         }
@@ -45,7 +45,6 @@ namespace WebApplication1.Repository
         public virtual async Task UpdateAsync(T entity)
         {
             _dbSet.Update(entity);
-            // Removed SaveChangesAsync - will be handled by Unit of Work
         }
     }
 }

@@ -9,6 +9,6 @@ namespace WebApplication1.Service.Interface
     public interface IReadService<TResponseDto>
     {
         Task<ServiceResult<IEnumerable<TResponseDto>>> GetAllAsync();
-        Task<ServiceResult<TResponseDto>> GetByIdAsync(int id);
+        Task<ServiceResult<TResponseDto>> GetByIdAsync(Guid id);
     }
 }

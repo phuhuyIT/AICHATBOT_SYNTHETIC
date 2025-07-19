@@ -11,7 +11,7 @@ namespace WebApplication1.Service.Interface
     public interface IWriteService<TCreateDto, TUpdateDto, TResponseDto>
     {
         Task<ServiceResult<TResponseDto>> CreateAsync(TCreateDto createDto);
-        Task<ServiceResult<TResponseDto>> UpdateAsync(int id, TUpdateDto updateDto);
-        Task<ServiceResult<bool>>       DeleteAsync(int id);
+        Task<ServiceResult<TResponseDto>> UpdateAsync(Guid id, TUpdateDto updateDto);
+        Task<ServiceResult<bool>> DeleteAsync(Guid id);
     }
 }

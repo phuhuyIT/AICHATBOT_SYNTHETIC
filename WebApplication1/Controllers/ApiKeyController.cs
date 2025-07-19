@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WebApplication1.DTO.ApiKey;
 using WebApplication1.Service.Interface;
@@ -42,16 +41,14 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetApiKeyById(int id)
+        public async Task<IActionResult> GetApiKeyById(Guid id)
         {
             try
             {
                 var result = await _apiKeyService.GetByIdAsync(id);
                 
                 if (result.IsSuccess)
-                {
                     return Ok(new { success = true, data = result.Data, message = result.Message });
-                }
                 
                 return NotFound(new { success = false, message = result.Message });
             }
@@ -90,7 +87,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateApiKey(int id, [FromBody] ApiKeyUpdateDTO apiKeyDto)
+        public async Task<IActionResult> UpdateApiKey(Guid id, [FromBody] ApiKeyUpdateDTO apiKeyDto)
         {
             try
             {
@@ -121,7 +118,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteApiKey(int id)
+        public async Task<IActionResult> DeleteApiKey(Guid id)
         {
             try
             {
@@ -146,7 +143,7 @@ namespace WebApplication1.Controllers
         #region Model-Specific Operations
 
         [HttpGet("model/{modelId}")]
-        public async Task<IActionResult> GetApiKeysByModelId(int modelId)
+        public async Task<IActionResult> GetApiKeysByModelId(Guid modelId)
         {
             try
             {
@@ -167,7 +164,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPost("model/{modelId}/create")]
-        public async Task<IActionResult> CreateApiKeysForModel(int modelId, [FromBody] List<ApiKeyCreateDTO> apiKeyDtos)
+        public async Task<IActionResult> CreateApiKeysForModel(Guid modelId, [FromBody] List<ApiKeyCreateDTO> apiKeyDtos)
         {
             try
             {
@@ -194,7 +191,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPost("model/{modelId}/bulk-create")]
-        public async Task<IActionResult> CreateApiKeysForModelBulk(int modelId, [FromBody] BulkApiKeyCreateDTO bulkCreateDto)
+        public async Task<IActionResult> CreateApiKeysForModelBulk(Guid modelId, [FromBody] BulkApiKeyCreateDTO bulkCreateDto)
         {
             try
             {
@@ -226,7 +223,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPut("model/{modelId}/update")]
-        public async Task<IActionResult> UpdateApiKeysForModel(int modelId, [FromBody] List<ApiKeyUpdateDTO> apiKeyDtos)
+        public async Task<IActionResult> UpdateApiKeysForModel(Guid modelId, [FromBody] List<ApiKeyUpdateDTO> apiKeyDtos)
         {
             try
             {
@@ -252,7 +249,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPut("model/{modelId}/bulk-update")]
-        public async Task<IActionResult> UpdateApiKeysForModelBulk(int modelId, [FromBody] BulkApiKeyUpdateDTO bulkUpdateDto)
+        public async Task<IActionResult> UpdateApiKeysForModelBulk(Guid modelId, [FromBody] BulkApiKeyUpdateDTO bulkUpdateDto)
         {
             try
             {
@@ -283,7 +280,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpDelete("model/{modelId}")]
-        public async Task<IActionResult> DeleteApiKeysByModelId(int modelId)
+        public async Task<IActionResult> DeleteApiKeysByModelId(Guid modelId)
         {
             try
             {
@@ -360,7 +357,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet("check-unique/{apiKeyValue}")]
-        public async Task<IActionResult> CheckApiKeyUnique(string apiKeyValue, [FromQuery] int? excludeId = null)
+        public async Task<IActionResult> CheckApiKeyUnique(string apiKeyValue, [FromQuery] Guid? excludeId = null)
         {
             try
             {

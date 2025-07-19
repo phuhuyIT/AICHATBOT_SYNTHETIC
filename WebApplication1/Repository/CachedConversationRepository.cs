@@ -24,9 +24,9 @@ namespace WebApplication1.Repository
             _logger = logger;
         }
         
-        public override async Task<IEnumerable<Conversation>> GetUserConversationsAsync(string userId, bool includeMessages = false)
+        public override async Task<IEnumerable<Conversation>> GetUserConversationsAsync(string userId, bool includeBranches = false)
         {
-            var cacheKey = $"{UserConversationsPrefix}{userId}_{includeMessages}";
+            var cacheKey = $"{UserConversationsPrefix}{userId}_{includeBranches}";
             
             // Try to get from cache
             var cachedResult = _cacheService.Get<IEnumerable<Conversation>>(cacheKey);
@@ -37,7 +37,7 @@ namespace WebApplication1.Repository
             }
             
             // Get from database
-            var result = await base.GetUserConversationsAsync(userId, includeMessages);
+            var result = await base.GetUserConversationsAsync(userId, includeBranches);
             
             // Cache the result
             _cacheService.Set(cacheKey, result, TimeSpan.FromMinutes(15));
@@ -45,20 +45,20 @@ namespace WebApplication1.Repository
             return result;
         }
         
-        public override async Task<Conversation?> GetConversationWithMessagesAsync(int conversationId)
+        public override async Task<Conversation?> GetConversationWithBranchesAsync(Guid conversationId)
         {
-            var cacheKey = $"{ConversationPrefix}{conversationId}_with_messages";
+            var cacheKey = $"{ConversationPrefix}{conversationId}_with_branches";
             
             // Try to get from cache
             var cachedResult = _cacheService.Get<Conversation?>(cacheKey);
             if (cachedResult != null)
             {
-                _logger.LogInformation("Cache hit for conversation with messages: {ConversationId}", conversationId);
+                _logger.LogInformation("Cache hit for conversation with branches: {ConversationId}", conversationId);
                 return cachedResult;
             }
             
             // Get from database
-            var result = await base.GetConversationWithMessagesAsync(conversationId);
+            var result = await base.GetConversationWithBranchesAsync(conversationId);
             
             // Cache the result
             if (result != null)
@@ -128,7 +128,7 @@ namespace WebApplication1.Repository
             InvalidateConversationCache(entity.ConversationId);
         }
         
-        public override async Task<bool> DeleteAsync(int id)
+        public override async Task<bool> DeleteAsync(Guid id)
         {
             var entity = await GetByIdAsync(id);
             if (entity != null)
@@ -140,7 +140,7 @@ namespace WebApplication1.Repository
             return await base.DeleteAsync(id);
         }
         
-        public override async Task<bool> DeactivateConversationAsync(int conversationId)
+        public override async Task<bool> DeactivateConversationAsync(Guid conversationId)
         {
             var conversation = await GetByIdAsync(conversationId);
             if (conversation != null)
@@ -161,9 +161,9 @@ namespace WebApplication1.Repository
             _cacheService.Remove($"{ActiveConversationsPrefix}{userId}");
         }
         
-        private void InvalidateConversationCache(int conversationId)
+        private void InvalidateConversationCache(Guid conversationId)
         {
-            _cacheService.Remove($"{ConversationPrefix}{conversationId}_with_messages");
+            _cacheService.Remove($"{ConversationPrefix}{conversationId}_with_branches");
         }
     }
 }

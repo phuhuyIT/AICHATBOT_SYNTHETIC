@@ -29,7 +29,7 @@ namespace WebApplication1.Controllers
 
         // GET api/conversation/{id}
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<IActionResult> GetById(Guid id)
         {
             var result = await _conversationService.GetByIdAsync(id);
             if (result.IsSuccess)
@@ -52,7 +52,7 @@ namespace WebApplication1.Controllers
 
         // PUT api/conversation/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] ConversationUpdateDTO dto)
+        public async Task<IActionResult> Update(Guid id, [FromBody] ConversationUpdateDTO dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -68,7 +68,7 @@ namespace WebApplication1.Controllers
 
         // DELETE api/conversation/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(Guid id)
         {
             var result = await _conversationService.DeleteAsync(id);
             if (result.IsSuccess)

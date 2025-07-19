@@ -44,13 +44,13 @@ namespace WebApplication1.Service
         }
 
         // READ SINGLE
-        public async Task<ServiceResult<ApiKeyResponseDTO>> GetByIdAsync(int id)
+        public async Task<ServiceResult<ApiKeyResponseDTO>> GetByIdAsync(Guid id)
         {
             return await GetByIdInternalAsync(id);
         }
 
         // UPDATE
-        public async Task<ServiceResult<ApiKeyResponseDTO>> UpdateAsync(int id, ApiKeyUpdateDTO updateDto)
+        public async Task<ServiceResult<ApiKeyResponseDTO>> UpdateAsync(Guid id, ApiKeyUpdateDTO updateDto)
         {
             if (updateDto == null)
             {
@@ -62,7 +62,7 @@ namespace WebApplication1.Service
         }
 
         // DELETE
-        public async Task<ServiceResult<bool>> DeleteAsync(int id)
+        public async Task<ServiceResult<bool>> DeleteAsync(Guid id)
         {
             try
             {
@@ -116,7 +116,7 @@ namespace WebApplication1.Service
             }
         }
 
-        private async Task<ServiceResult<ApiKeyResponseDTO>> GetByIdInternalAsync(int id)
+        private async Task<ServiceResult<ApiKeyResponseDTO>> GetByIdInternalAsync(Guid id)
         {
             try
             {
@@ -195,7 +195,7 @@ namespace WebApplication1.Service
 
         #region Model-Specific Operations
 
-        public async Task<ServiceResult<List<ChatBotApiKey>>> GetApiKeysByModelIdAsync(int modelId)
+        public async Task<ServiceResult<List<ChatBotApiKey>>> GetApiKeysByModelIdAsync(Guid modelId)
         {
             try
             {
@@ -210,7 +210,7 @@ namespace WebApplication1.Service
             }
         }
         
-        public async Task<ServiceResult<List<ApiKeyResponseDTO>>> GetApiKeysByModelIdWithDtoAsync(int modelId)
+        public async Task<ServiceResult<List<ApiKeyResponseDTO>>> GetApiKeysByModelIdWithDtoAsync(Guid modelId)
         {
             try
             {
@@ -230,7 +230,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<List<ChatBotApiKey>>> CreateApiKeysAsync(int chatbotModelId, List<ApiKeyCreateDTO> apiKeyDtos)
+        public async Task<ServiceResult<List<ChatBotApiKey>>> CreateApiKeysAsync(Guid chatbotModelId, List<ApiKeyCreateDTO> apiKeyDtos)
         {
             if (apiKeyDtos == null || !apiKeyDtos.Any())
             {
@@ -260,7 +260,7 @@ namespace WebApplication1.Service
             }
         }
         
-        public async Task<ServiceResult<List<ApiKeyResponseDTO>>> CreateApiKeysWithDtoAsync(int chatbotModelId, List<ApiKeyCreateDTO> apiKeyDtos)
+        public async Task<ServiceResult<List<ApiKeyResponseDTO>>> CreateApiKeysWithDtoAsync(Guid chatbotModelId, List<ApiKeyCreateDTO> apiKeyDtos)
         {
             if (apiKeyDtos == null || !apiKeyDtos.Any())
             {
@@ -296,7 +296,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<bool>> UpdateApiKeysAsync(int chatbotModelId, List<ApiKeyUpdateDTO> apiKeyDtos)
+        public async Task<ServiceResult<bool>> UpdateApiKeysAsync(Guid chatbotModelId, List<ApiKeyUpdateDTO> apiKeyDtos)
         {
             if (apiKeyDtos == null || !apiKeyDtos.Any())
             {
@@ -331,7 +331,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<bool>> DeleteApiKeysByModelIdAsync(int chatbotModelId)
+        public async Task<ServiceResult<bool>> DeleteApiKeysByModelIdAsync(Guid chatbotModelId)
         {
             try
             {
@@ -401,7 +401,7 @@ namespace WebApplication1.Service
             }
         }
 
-        public async Task<ServiceResult<bool>> IsApiKeyUniqueAsync(string apiKeyValue, int? excludeId = null)
+        public async Task<ServiceResult<bool>> IsApiKeyUniqueAsync(string apiKeyValue, Guid? excludeId = null)
         {
             try
             {

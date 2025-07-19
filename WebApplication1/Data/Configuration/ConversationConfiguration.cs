@@ -19,7 +19,7 @@ namespace WebApplication1.Data.Configuration
                 
             builder.HasIndex(c => new { c.UserId, c.IsActive })
                 .HasDatabaseName("IX_Conversations_UserId_IsActive");
-                
+
             builder.HasIndex(c => c.StartedAt)
                 .HasDatabaseName("IX_Conversations_StartedAt");
         }
