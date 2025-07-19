@@ -137,7 +137,7 @@ namespace WebApplication1.Controllers
             {
                 bool result = await _authService.LoginAsync(model);
                 var user = await _userManager.FindByEmailAsync(model.Email);
-                jwtToken = await _tokenService.GenerateTokens(HttpContext, user);
+                jwtToken = (await _tokenService.GenerateTokens(HttpContext, user)).Data;
             }
             catch (Exception ex)
             {
@@ -153,7 +153,7 @@ namespace WebApplication1.Controllers
         public async Task<IActionResult> Logout()
         {
             // delete refresh token from database
-            bool isDeleted = await _tokenService.DeleteRefreshToken(HttpContext);
+            bool isDeleted = (await _tokenService.DeleteRefreshToken(HttpContext)).Data;
             if (!isDeleted)
             {
                 return BadRequest("Failed to revoke refresh token.");
@@ -186,8 +186,8 @@ namespace WebApplication1.Controllers
         [HttpPost("revoke")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> RevokeRefreshToken()
-        {
-            if(! _tokenService.RevokeToken(HttpContext, User))
+        {   
+            if(! _tokenService.RevokeToken(HttpContext, User).Data )
             {
                 return BadRequest("Failed to revoke refresh token.");
             }

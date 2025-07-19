@@ -20,7 +20,7 @@ namespace WebApplication1.Service
 
         public async Task<ServiceResult<Conversation>> StartNewConversationAsync(string userId, bool isPaidUser)
         {
-            try
+            return await ServiceResult<Conversation>.ExecuteWithTransactionAsync(async () =>
             {
                 var conversation = new Conversation
                 {
@@ -32,35 +32,24 @@ namespace WebApplication1.Service
                 };
 
                 await _unitOfWork.ConversationRepository.AddAsync(conversation);
-                await _unitOfWork.SaveChangesAsync();
                 
                 _logger.LogInformation("New conversation started for user {UserId}", userId);
                 return ServiceResult<Conversation>.Success(conversation);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error starting new conversation for user {UserId}", userId);
-                return ServiceResult<Conversation>.Failure("Failed to start new conversation");
-            }
+            }, _unitOfWork, _logger, $"Error starting new conversation for user {userId}");
         }
 
         public async Task<ServiceResult<IEnumerable<Conversation>>> GetUserConversationsAsync(string userId, bool includeBranches = false)
         {
-            try
+            return await ServiceResult<IEnumerable<Conversation>>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var conversations = await _unitOfWork.ConversationRepository.GetUserConversationsAsync(userId, includeBranches);
                 return ServiceResult<IEnumerable<Conversation>>.Success(conversations);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting conversations for user {UserId}", userId);
-                return ServiceResult<IEnumerable<Conversation>>.Failure("Failed to retrieve conversations");
-            }
+            }, _unitOfWork, _logger, $"Error getting conversations for user {userId}");
         }
 
         public async Task<ServiceResult<Conversation>> GetConversationWithBranchesAsync(Guid conversationId, string userId)
         {
-            try
+            return await ServiceResult<Conversation>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 // Validate access
                 var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
@@ -76,17 +65,12 @@ namespace WebApplication1.Service
                 }
 
                 return ServiceResult<Conversation>.Success(conversation);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting conversation {ConversationId} for user {UserId}", conversationId, userId);
-                return ServiceResult<Conversation>.Failure("Failed to retrieve conversation");
-            }
+            }, _unitOfWork,_logger, $"Error getting conversation {conversationId} for user {userId}");
         }
 
         public async Task<ServiceResult<bool>> EndConversationAsync(Guid conversationId, string userId)
         {
-            try
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
             {
                 var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
                 if (!hasAccess)
@@ -102,17 +86,12 @@ namespace WebApplication1.Service
 
                 _logger.LogInformation("Conversation {ConversationId} ended by user {UserId}", conversationId, userId);
                 return ServiceResult<bool>.Success(true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error ending conversation {ConversationId} for user {UserId}", conversationId, userId);
-                return ServiceResult<bool>.Failure("Failed to end conversation");
-            }
+            }, _unitOfWork, _logger, $"Error ending conversation {conversationId} for user {userId}");
         }
 
         public async Task<ServiceResult<Conversation>> GetOrCreateActiveConversationAsync(string userId, bool isPaidUser)
         {
-            try
+            return await ServiceResult<Conversation>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var activeConversations = await _unitOfWork.ConversationRepository.GetActiveConversationsAsync(userId);
                 var latestConversation = activeConversations.FirstOrDefault();
@@ -124,122 +103,87 @@ namespace WebApplication1.Service
 
                 // Create new conversation if none exists
                 return await StartNewConversationAsync(userId, isPaidUser);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting or creating active conversation for user {UserId}", userId);
-                return ServiceResult<Conversation>.Failure("Failed to get or create conversation");
-            }
+            }, _unitOfWork,_logger, $"Error getting or creating active conversation for user {userId}");
         }
 
         public async Task<ServiceResult<bool>> ValidateConversationAccessAsync(Guid conversationId, string userId)
         {
-            try
+            return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
                 return ServiceResult<bool>.Success(hasAccess);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating access to conversation {ConversationId} for user {UserId}", conversationId, userId);
-                return ServiceResult<bool>.Failure("Failed to validate access");
-            }
+            }, _unitOfWork,_logger, $"Error validating access to conversation {conversationId} for user {userId}");
         }
 
         #region IReadService / IWriteService Implementation
 
         public async Task<ServiceResult<ConversationResponseDTO>> CreateAsync(ConversationCreateDTO createDto)
         {
-            var entity = ConversationMappingService.ToEntity(createDto);
-            try
+            return await ServiceResult<ConversationResponseDTO>.ExecuteWithTransactionAsync(async () =>
             {
+                var entity = ConversationMappingService.ToEntity(createDto);
                 await _unitOfWork.ConversationRepository.AddAsync(entity);
-                await _unitOfWork.SaveChangesAsync();
+
                 var dto = ConversationMappingService.ToResponseDTO(entity);
                 return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation created");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating conversation for user {UserId}", createDto.UserId);
-                return ServiceResult<ConversationResponseDTO>.Failure("Failed to create conversation");
-            }
+            }, _unitOfWork, _logger, $"Error creating conversation for user {createDto.UserId}");
         }
-        
 
         public async Task<ServiceResult<ConversationResponseDTO>> UpdateAsync(Guid id, ConversationUpdateDTO updateDto)
         {
-            try
+            return await ServiceResult<ConversationResponseDTO>.ExecuteWithTransactionAsync(async () =>
+            {
+                var entity = await _unitOfWork.ConversationRepository.GetByIdAsync(id);
+                if (entity == null)
+                {
+                    return ServiceResult<ConversationResponseDTO>.Failure("Conversation not found");
+                }
+
+                ConversationMappingService.UpdateEntity(entity, updateDto);
+                await _unitOfWork.ConversationRepository.UpdateAsync(entity);
+
+                var dto = ConversationMappingService.ToResponseDTO(entity);
+                return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation updated");
+            }, _unitOfWork, _logger, $"Error updating conversation {id}");
+        }
+
+        public async Task<ServiceResult<IEnumerable<ConversationResponseDTO>>> GetAllAsync()
+        {
+            return await ServiceResult<IEnumerable<ConversationResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
+            {
+                var conversations = await _unitOfWork.ConversationRepository.GetAllAsync();
+                var dtos = conversations.Select(ConversationMappingService.ToResponseDTO);
+                return ServiceResult<IEnumerable<ConversationResponseDTO>>.Success(dtos);
+            }, _unitOfWork,_logger, "Error getting all conversations");
+        }
+
+        public async Task<ServiceResult<ConversationResponseDTO>> GetByIdAsync(Guid id)
+        {
+            return await ServiceResult<ConversationResponseDTO>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var entity = await _unitOfWork.ConversationRepository.GetByIdAsync(id);
                 if (entity == null)
                     return ServiceResult<ConversationResponseDTO>.Failure("Conversation not found");
 
-                ConversationMappingService.UpdateEntity(entity, updateDto);
-                await _unitOfWork.ConversationRepository.UpdateAsync(entity);
-                await _unitOfWork.SaveChangesAsync();
                 var dto = ConversationMappingService.ToResponseDTO(entity);
-                return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation updated");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating conversation {Id}", id);
-                return ServiceResult<ConversationResponseDTO>.Failure("Failed to update conversation");
-            }
-        }
-
-        public async Task<ServiceResult<IEnumerable<ConversationResponseDTO>>> GetAllAsync()
-        {
-            try
-            {
-                var conversations = await _unitOfWork.ConversationRepository.GetAllAsync();
-                var dtos = conversations.Select(ConversationMappingService.ToResponseDTO);
-                return ServiceResult<IEnumerable<ConversationResponseDTO>>.Success(dtos);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting all conversations");
-                return ServiceResult<IEnumerable<ConversationResponseDTO>>.Failure("Failed to retrieve conversations");
-            }
-        }
-
-        public async Task<ServiceResult<ConversationResponseDTO>> GetByIdAsync(Guid id)
-        {
-            try
-            {
-                var conversation = await _unitOfWork.ConversationRepository.GetByIdAsync(id);
-                if (conversation == null)
-                {
-                    return ServiceResult<ConversationResponseDTO>.Failure("Conversation not found");
-                }
-                var dto = ConversationMappingService.ToResponseDTO(conversation);
                 return ServiceResult<ConversationResponseDTO>.Success(dto);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting conversation {Id}", id);
-                return ServiceResult<ConversationResponseDTO>.Failure("Failed to retrieve conversation");
-            }
+            }, _unitOfWork,_logger, $"Error getting conversation {id}");
         }
-
-        // DeleteAsync(int id) already exists below and fits the new interface – leave as is.
-
-        #endregion
-
-        // ---- Legacy entity-based CRUD methods kept for backward compatibility ----
 
         public async Task<ServiceResult<bool>> DeleteAsync(Guid id)
         {
-            try
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
             {
                 var result = await _unitOfWork.ConversationRepository.DeleteAsync(id);
-                await _unitOfWork.SaveChangesAsync();
-                return ServiceResult<bool>.Success(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting conversation {Id}", id);
-                return ServiceResult<bool>.Failure("Failed to delete conversation");
-            }
+                if (!result)
+                {
+                    return ServiceResult<bool>.Failure("Conversation not found");
+                }
+
+                return ServiceResult<bool>.Success(true, "Conversation deleted");
+            }, _unitOfWork, _logger, $"Error deleting conversation {id}");
         }
+
+        #endregion
     }
 }

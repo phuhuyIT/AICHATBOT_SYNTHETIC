@@ -8,6 +8,7 @@ namespace WebApplication1.Repository.Interface
         IConversationBranchRepository ConversationBranchRepository { get; }
         IMessageRepository MessageRepository { get; }
         IGenericRepository<ChatbotModel> ChatbotModelsRepository { get; }
+        IGenericRepository<RefreshToken> RefreshTokenRepository { get; }
         ITemplateRepository TemplateRepository { get; }
         
         Task<int> SaveChangesAsync();

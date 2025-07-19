@@ -16,6 +16,7 @@ namespace WebApplication1.Repository
         private IConversationBranchRepository? _conversationBranchRepository;
         private IMessageRepository? _messageRepository;
         private IChatbotModelsRepository? _chatbotModelsRepository;
+        private IGenericRepository<RefreshToken>? _refreshTokenRepository;
         private ITemplateRepository? _templateRepository;
 
         public UnitOfWork(ApplicationDbContext context,
@@ -44,6 +45,9 @@ namespace WebApplication1.Repository
 
         public IGenericRepository<ChatbotModel> ChatbotModelsRepository => _chatbotModelsRepository ??= 
             new ChatbotModelsRepository(_context);
+
+        public IGenericRepository<RefreshToken> RefreshTokenRepository => _refreshTokenRepository ??= 
+            new GenericRepository<RefreshToken>(_context);
 
         public ITemplateRepository TemplateRepository => _templateRepository!;
 

@@ -43,7 +43,7 @@ namespace WebApplication1.Service
 
         public async Task<ServiceResult<Message>> SendMessageAsync(string userId, Guid conversationId, string userMessage, string modelName)
         {
-            try
+            return await ServiceResult<Message>.ExecuteWithTransactionAsync(async () =>
             {
                 // Validate conversation access
                 var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
@@ -60,7 +60,6 @@ namespace WebApplication1.Service
                 if (mainBranch.BranchId == Guid.Empty)
                 {
                     await _unitOfWork.ConversationBranchRepository.AddAsync(mainBranch);
-                    await _unitOfWork.SaveChangesAsync();
                 }
 
                 // Get conversation history for context
@@ -75,49 +74,23 @@ namespace WebApplication1.Service
                 }
 
                 // Create and save user message
-                var userMsg = new Message
-                {
-                    BranchId = mainBranch.BranchId,
-                    Role = "user",
-                    Content = userMessage,
-                    ModelUsed = modelName,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
+                var userMsg = CreateUserMessage(mainBranch.BranchId, userMessage, modelName);
                 await _unitOfWork.MessageRepository.AddAsync(userMsg);
-                await _unitOfWork.SaveChangesAsync();
 
                 // Create and save AI response message
-                var aiMessage = new Message
-                {
-                    BranchId = mainBranch.BranchId,
-                    Role = "assistant",
-                    Content = aiResponseResult.Data,
-                    ModelUsed = modelName,
-                    ParentMessageId = userMsg.MessageId,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
+                var aiMessage = CreateAIMessage(mainBranch.BranchId, aiResponseResult.Data, modelName, userMsg.MessageId);
                 await _unitOfWork.MessageRepository.AddAsync(aiMessage);
-                await _unitOfWork.SaveChangesAsync();
                 
                 _logger.LogInformation("Message sent successfully in conversation {ConversationId} using model {ModelName}", 
                     conversationId, modelName);
                 
                 return ServiceResult<Message>.Success(aiMessage);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending message in conversation {ConversationId}", conversationId);
-                return ServiceResult<Message>.Failure("Failed to send message");
-            }
+            }, _unitOfWork, _logger, $"Error sending message in conversation {conversationId}");
         }
 
         public async Task<ServiceResult<string>> GetAIResponseAsync(string userMessage, string modelName, List<Message> conversationHistory)
         {
-            try
+            return await ServiceResult<string>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 // Get API key for the model
                 var apiKeyResult = await _apiKeyService.GetApiKeyForModelAsync(modelName);
@@ -137,12 +110,7 @@ namespace WebApplication1.Service
                     var model when model.StartsWith("grok") => await GetGrokResponse(userMessage, modelName, conversationHistory, apiKey),
                     _ => ServiceResult<string>.Failure("Unsupported model: " + modelName)
                 };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting AI response for model {ModelName}", modelName);
-                return ServiceResult<string>.Failure("Failed to get AI response");
-            }
+            }, _unitOfWork,_logger, $"Error getting AI response for model {modelName}");
         }
 
         private async Task<ServiceResult<string>> GetOpenAIResponse(string userMessage, string modelName, List<Message> conversationHistory, string apiKey)
@@ -354,7 +322,7 @@ namespace WebApplication1.Service
 
         public async Task<ServiceResult<IEnumerable<Message>>> GetConversationMessagesAsync(Guid conversationId, string userId)
         {
-            try
+            return await ServiceResult<IEnumerable<Message>>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
                 if (!hasAccess)
@@ -364,17 +332,12 @@ namespace WebApplication1.Service
 
                 var messages = await _unitOfWork.MessageRepository.GetConversationMessagesAsync(conversationId);
                 return ServiceResult<IEnumerable<Message>>.Success(messages);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting messages for conversation {ConversationId}", conversationId);
-                return ServiceResult<IEnumerable<Message>>.Failure("Failed to retrieve messages");
-            }
+            }, _unitOfWork,_logger, $"Error getting messages for conversation {conversationId}");
         }
 
         public async Task<ServiceResult<IEnumerable<Message>>> GetPaginatedMessagesAsync(Guid branchId, string userId, int pageNumber, int pageSize)
         {
-            try
+            return await ServiceResult<IEnumerable<Message>>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 // Get conversation ID from branch to validate access
                 var branch = await _unitOfWork.ConversationBranchRepository.GetByIdAsync(branchId);
@@ -391,17 +354,12 @@ namespace WebApplication1.Service
 
                 var messages = await _unitOfWork.MessageRepository.GetPaginatedMessagesAsync(branchId, pageNumber, pageSize);
                 return ServiceResult<IEnumerable<Message>>.Success(messages);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting paginated messages for branch {BranchId}", branchId);
-                return ServiceResult<IEnumerable<Message>>.Failure("Failed to retrieve messages");
-            }
+            }, _unitOfWork,_logger, $"Error getting paginated messages for branch {branchId}");
         }
 
         public async Task<ServiceResult<bool>> DeleteMessageAsync(Guid messageId, string userId)
         {
-            try
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
             {
                 var message = await _unitOfWork.MessageRepository.GetByIdAsync(messageId);
                 if (message == null)
@@ -422,23 +380,17 @@ namespace WebApplication1.Service
                     return ServiceResult<bool>.Failure("Access denied to message");
                 }
 
-                // Soft delete by updating timestamp (no IsActive in new model)
+                // Soft delete by updating timestamp
                 message.UpdatedAt = DateTime.UtcNow;
                 await _unitOfWork.MessageRepository.UpdateAsync(message);
-                await _unitOfWork.SaveChangesAsync();
 
                 return ServiceResult<bool>.Success(true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting message {MessageId}", messageId);
-                return ServiceResult<bool>.Failure("Failed to delete message");
-            }
+            }, _unitOfWork, _logger, $"Error deleting message {messageId}");
         }
 
         public async Task<ServiceResult<Message>> RegenerateResponseAsync(Guid messageId, string userId, string? newModelName = null)
         {
-            try
+            return await ServiceResult<Message>.ExecuteWithTransactionAsync(async () =>
             {
                 var message = await _unitOfWork.MessageRepository.GetByIdAsync(messageId);
                 if (message == null)
@@ -480,20 +432,14 @@ namespace WebApplication1.Service
                 message.UpdatedAt = DateTime.UtcNow;
                 
                 await _unitOfWork.MessageRepository.UpdateAsync(message);
-                await _unitOfWork.SaveChangesAsync();
 
                 return ServiceResult<Message>.Success(message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error regenerating response for message {MessageId}", messageId);
-                return ServiceResult<Message>.Failure("Failed to regenerate response");
-            }
+            }, _unitOfWork, _logger, $"Error regenerating response for message {messageId}");
         }
 
         public async Task<ServiceResult<IEnumerable<string>>> GetAvailableModelsAsync(bool isPaidUser)
         {
-            try
+            return await ServiceResult<IEnumerable<string>>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var modelsResult = await _chatbotModelsService.GetAllAsync();
                 if (!modelsResult.IsSuccess)
@@ -508,12 +454,38 @@ namespace WebApplication1.Service
                     .ToList();
 
                 return ServiceResult<IEnumerable<string>>.Success(availableModels);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting available models");
-                return ServiceResult<IEnumerable<string>>.Failure("Failed to retrieve available models");
-            }
+            }, _unitOfWork,_logger, "Error getting available models");
         }
+
+        #region Private Helper Methods
+
+        private static Message CreateUserMessage(Guid branchId, string content, string modelName)
+        {
+            return new Message
+            {
+                BranchId = branchId,
+                Role = "user",
+                Content = content,
+                ModelUsed = modelName,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        private static Message CreateAIMessage(Guid branchId, string content, string modelName, Guid parentMessageId)
+        {
+            return new Message
+            {
+                BranchId = branchId,
+                Role = "assistant",
+                Content = content,
+                ModelUsed = modelName,
+                ParentMessageId = parentMessageId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        #endregion
     }
 }

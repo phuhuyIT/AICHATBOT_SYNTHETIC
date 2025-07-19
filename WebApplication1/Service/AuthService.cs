@@ -16,37 +16,36 @@ namespace WebApplication1.Service
         private readonly UserManager<User> _userManager;
         private readonly ITokenService _tokenService;
         private readonly Interface.IEmailSender _emailSenderService;
-        private readonly ApplicationDbContext db;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<AuthService> _logger;
         
-        public AuthService(UserManager<User> userManager, ITokenService tokenService, Interface.IEmailSender emailSender, ApplicationDbContext dbContext, ILogger<AuthService> logger)
+        public AuthService(UserManager<User> userManager, ITokenService tokenService, Interface.IEmailSender emailSender, IUnitOfWork unitOfWork, ILogger<AuthService> logger)
         {
             _userManager = userManager;
             _tokenService = tokenService;
             _emailSenderService = emailSender;
-            db = dbContext;
+            _unitOfWork = unitOfWork;
             _logger = logger;
         }
 
         public async Task<bool> LoginAsync(LoginRequest loginDTO)
         {
-            var user = await FindUserByEmailAsync(loginDTO.Email);
-            
-            var result = await _userManager.CheckPasswordAsync(user, loginDTO.Password);
-            if (!result)
+            return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
-                throw new Exception("Sai mật khẩu.");
-            }
-            return true;
+                var user = await FindUserByEmailAsync(loginDTO.Email);
+                
+                var result = await _userManager.CheckPasswordAsync(user, loginDTO.Password);
+                if (!result)
+                {
+                    throw new Exception("Sai mật khẩu.");
+                }
+                return ServiceResult<bool>.Success(true);
+            }, _unitOfWork,_logger, $"Error during login for email {loginDTO.Email}").ContinueWith(t => t.Result.Data);
         }
 
-        public async Task<IdentityResult> RegisterAsync(RegisterDTO registerDTO, User user)
+        public async Task<IdentityResult?> RegisterAsync(RegisterDTO registerDTO, User user)
         {
-            IdentityResult result;
-    
-            // Begin transaction for user creation only
-            using var transaction = await db.Database.BeginTransactionAsync();
-            try
+            return await ServiceResult<IdentityResult>.ExecuteWithTransactionAsync(async () =>
             {
                 var existingUser = await _userManager.FindByEmailAsync(registerDTO.Email);
                 if (existingUser != null)
@@ -54,106 +53,83 @@ namespace WebApplication1.Service
                     throw new Exception("Email already exists.");
                 }
 
-                result = await _userManager.CreateAsync(user, registerDTO.Password);
+                var result = await _userManager.CreateAsync(user, registerDTO.Password);
                 if (!result.Succeeded)
                 {
-                    // 1. Build a single readable message from Identity errors
                     var errorMessages = string.Join(", ", result.Errors.Select(e => e.Description));
-
-                    // 2. Log the details (good for server-side diagnostics)
                     _logger.LogError("User creation failed for email {Email}. Errors: {Errors}",
                         registerDTO.Email, errorMessages);
-
-                    // 3. Throw one descriptive exception so the controller can return 400
                     throw new Exception($"Có lỗi khi tạo tài khoản: {errorMessages}");
                 }   
                 
                 await _userManager.AddToRoleAsync(user, "User");
-                await transaction.CommitAsync();
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
 
-            // Send email after successful user creation
-            try
-            {
-                await SendEmailConfirmationAsync(user, "Confirm your email");
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw new Exception("Có lỗi khi gửi email sau khi tạo tài khoản.");
-            }
+                // Send email after successful user creation
+                await SendEmailConfirmationWithErrorHandling(user);
 
-            return result;
+                return ServiceResult<IdentityResult>.Success(result);
+            }, _unitOfWork, _logger, $"Error registering user with email {registerDTO.Email}").ContinueWith(t => t.Result.Data);
         }
 
         public async Task<bool> ConfirmEmailAsync(string email, string token)
         {
-            _logger.LogInformation("Starting email confirmation process for: {Email}", email);
-            
-            ValidateEmailInput(email);
-            ValidateTokenInput(token, email);
-            
-            var user = await FindUserByEmailAsync(email);
-            _logger.LogInformation("User found for email confirmation: {Email}, UserId: {UserId}", email, user.Id);
-
-            ValidateEmailNotAlreadyConfirmed(user);
-
-            // Attempt to confirm email
-            var confirmResult = await _userManager.ConfirmEmailAsync(user, token);
-            if (!confirmResult.Succeeded)
+            return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
-                var errors = string.Join(", ", confirmResult.Errors.Select(e => e.Description));
-                _logger.LogWarning("Email confirmation failed for user: {Email}, UserId: {UserId}. Errors: {Errors}", 
-                    email, user.Id, errors);
+                _logger.LogInformation("Starting email confirmation process for: {Email}", email);
                 
-                // Check for specific error types
-                if (confirmResult.Errors.Any(e => e.Code.Contains("InvalidToken") || e.Description.Contains("Invalid token")))
-                {
-                    throw new Exception("Token xác nhận không hợp lệ hoặc đã hết hạn! Vui lòng yêu cầu gửi lại email xác nhận.");
-                }
+                ValidateEmailInput(email);
+                ValidateTokenInput(token, email);
                 
-                throw new Exception($"Xác nhận email thất bại: {errors}. Bạn có thể thử gửi lại email xác nhận.");
-            }
+                var user = await FindUserByEmailAsync(email);
+                _logger.LogInformation("User found for email confirmation: {Email}, UserId: {UserId}", email, user.Id);
 
-            _logger.LogInformation("Email confirmation successful for user: {Email}, UserId: {UserId}", email, user.Id);
-            return true;
+                ValidateEmailNotAlreadyConfirmed(user);
+
+                var confirmResult = await _userManager.ConfirmEmailAsync(user, token);
+                if (!confirmResult.Succeeded)
+                {
+                    var errors = string.Join(", ", confirmResult.Errors.Select(e => e.Description));
+                    _logger.LogWarning("Email confirmation failed for user: {Email}, UserId: {UserId}. Errors: {Errors}", 
+                        email, user.Id, errors);
+                    
+                    if (confirmResult.Errors.Any(e => e.Code.Contains("InvalidToken") || e.Description.Contains("Invalid token")))
+                    {
+                        throw new Exception("Token xác nhận không hợp lệ hoặc đã hết hạn! Vui lòng yêu cầu gửi lại email xác nhận.");
+                    }
+                    
+                    throw new Exception($"Xác nhận email thất bại: {errors}. Bạn có thể thử gửi lại email xác nhận.");
+                }
+
+                _logger.LogInformation("Email confirmation successful for user: {Email}, UserId: {UserId}", email, user.Id);
+                return ServiceResult<bool>.Success(true);
+            },_unitOfWork ,_logger, $"Error confirming email for {email}").ContinueWith(t => t.Result.Data);
         }
 
         public async Task<bool> ResendEmailConfirmationAsync(string email)
         {
-            _logger.LogInformation("Starting resend email confirmation process for: {Email}", email);
-            
-            ValidateEmailInput(email);
-            
-            var user = await FindUserByEmailAsync(email);
-            _logger.LogInformation("User found for resend email confirmation: {Email}, UserId: {UserId}", email, user.Id);
-
-            ValidateEmailNotAlreadyConfirmed(user);
-
-            try
+            return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
+                _logger.LogInformation("Starting resend email confirmation process for: {Email}", email);
+                
+                ValidateEmailInput(email);
+                
+                var user = await FindUserByEmailAsync(email);
+                _logger.LogInformation("User found for resend email confirmation: {Email}, UserId: {UserId}", email, user.Id);
+
+                ValidateEmailNotAlreadyConfirmed(user);
+
                 await SendEmailConfirmationAsync(user, "Confirm your email - Resent");
                 _logger.LogInformation("Email confirmation resent successfully for user: {Email}, UserId: {UserId}", email, user.Id);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending email confirmation for user: {Email}, UserId: {UserId}", email, user.Id);
-                throw new Exception($"Có lỗi khi gửi email xác nhận: {ex.Message}");
-            }
+                return ServiceResult<bool>.Success(true);
+            }, _unitOfWork,_logger, $"Error resending email confirmation for {email}").ContinueWith(t => t.Result.Data);
         }
 
-        // Helper methods to eliminate duplicate code
-        private void ValidateEmailInput(string email)
+        #region Private Helper Methods
+
+        private static void ValidateEmailInput(string email)
         {
             if (string.IsNullOrWhiteSpace(email))
             {
-                _logger.LogWarning("Method called with null or empty email");
                 throw new ArgumentException("Email không được để trống.");
             }
         }
@@ -194,18 +170,33 @@ namespace WebApplication1.Service
             
             var emailTokens = new Dictionary<string, string>
             {
-                { "USER_NAME", user.UserName },
+                { "USER_NAME", user.UserName ?? string.Empty },
                 { "VERIFY_LINK", confirmationLink },
                 { "YEAR", DateTime.Now.Year.ToString() }
             };
             
             var emailBody = await _emailSenderService.RenderTemplateAsync("RegisterEmailTemplate.html", emailTokens);
-            await _emailSenderService.SendEmailAsync(user.Email, subject, emailBody);
+            await _emailSenderService.SendEmailAsync(user.Email ?? string.Empty, subject, emailBody);
         }
 
-        private string GenerateConfirmationLink(string email, string token)
+        private async Task SendEmailConfirmationWithErrorHandling(User user)
+        {
+            try
+            {
+                await SendEmailConfirmationAsync(user, "Confirm your email");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending email confirmation for user: {Email}, UserId: {UserId}", user.Email, user.Id);
+                throw new Exception($"Có lỗi khi gửi email xác nhận: {ex.Message}");
+            }
+        }
+
+        private static string GenerateConfirmationLink(string? email, string token)
         {
             return $"https://localhost:7214/api/auth/confirmemail?email={email}&token={System.Net.WebUtility.UrlEncode(token)}";
         }
+
+        #endregion
     }
 }

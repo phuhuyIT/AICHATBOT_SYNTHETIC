@@ -10,15 +10,15 @@ namespace WebApplication1.Service;
 public class ChatbotModelsService : IChatbotModelsService
 {
     private readonly ILogger<ChatbotModelsService> _logger;
-    private readonly IChatbotModelsRepository _chatbotModelsRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IApiKeyService _apiKeyService;
 
     public ChatbotModelsService(ILogger<ChatbotModelsService> logger, 
-        IChatbotModelsRepository chatbotModelsRepository,
+        IUnitOfWork unitOfWork,
         IApiKeyService apiKeyService)
     {
         _logger = logger;
-        _chatbotModelsRepository = chatbotModelsRepository;
+        _unitOfWork = unitOfWork;
         _apiKeyService = apiKeyService;
     }
 
@@ -26,13 +26,13 @@ public class ChatbotModelsService : IChatbotModelsService
 
     public async Task<ServiceResult<ChatbotModelResponseDTO>> CreateAsync(ChatbotModelCreateDTO createDto)
     {
-        if (createDto == null)
+        if (createDto is null)
         {
             _logger.LogError("ChatbotModelCreateDTO is null");
             return ServiceResult<ChatbotModelResponseDTO>.Failure("ChatbotModel data is null");
         }
 
-        try
+        return await ServiceResult<ChatbotModelResponseDTO>.ExecuteWithTransactionAsync(async () =>
         {
             var chatbotModel = new ChatbotModel
             {
@@ -41,7 +41,7 @@ public class ChatbotModelsService : IChatbotModelsService
                 IsAvailableForPaidUsers = createDto.IsAvailableForPaidUsers
             };
 
-            await _chatbotModelsRepository.AddAsync(chatbotModel);
+            await _unitOfWork.ChatbotModelsRepository.AddAsync(chatbotModel);
 
             // Handle API keys if provided
             if (createDto.ApiKeys?.Any() == true)
@@ -51,76 +51,55 @@ public class ChatbotModelsService : IChatbotModelsService
                 {
                     _logger.LogWarning("Failed to create API keys for ChatbotModel {ModelId}: {Message}", 
                         chatbotModel.Id, apiKeyResult.Message);
+                    return ServiceResult<ChatbotModelResponseDTO>.Failure($"Failed to create API keys: {apiKeyResult.Message}");
                 }
             }
 
-            var response = ChatbotModelMappingService.ToResponseDTO(chatbotModel);
-            return response != null 
-                ? ServiceResult<ChatbotModelResponseDTO>.Success(response, "ChatbotModel created successfully")
-                : ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error creating ChatbotModel");
-            return ServiceResult<ChatbotModelResponseDTO>.Failure($"Error creating ChatbotModel: {e.Message}");
-        }
+            return CreateSuccessResponse(chatbotModel, "ChatbotModel created successfully");
+        }, _unitOfWork, _logger, "Error creating ChatbotModel");
     }
 
     public async Task<ServiceResult<IEnumerable<ChatbotModelResponseDTO>>> GetAllAsync()
     {
-        try
+        return await ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
         {
-            var models = await _chatbotModelsRepository.GetAllAsync();
+            var models = await _unitOfWork.ChatbotModelsRepository.GetAllAsync();
             var dtos = ChatbotModelMappingService.ToResponseDTOList(models);
-            return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Success(dtos ?? new List<ChatbotModelResponseDTO>());
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error retrieving all ChatbotModels");
-            return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Failure($"Error: {e.Message}");
-        }
+            return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Success(dtos);
+        },_unitOfWork ,_logger, "Error retrieving all ChatbotModels");
     }
 
     public async Task<ServiceResult<ChatbotModelResponseDTO>> GetByIdAsync(Guid id)
     {
-        try
+        return await ServiceResult<ChatbotModelResponseDTO>.ExecuteWithErrorHandlingAsync(async () =>
         {
-            var model = await _chatbotModelsRepository.GetByIdAsync(id);
-            if (model == null)
+            var model = await _unitOfWork.ChatbotModelsRepository.GetByIdAsync(id);
+            if (model is null)
                 return ServiceResult<ChatbotModelResponseDTO>.Failure("Chatbot model not found");
 
-            var dto = ChatbotModelMappingService.ToResponseDTO(model);
-            return dto != null 
-                ? ServiceResult<ChatbotModelResponseDTO>.Success(dto)
-                : ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error retrieving ChatbotModel with ID {Id}", id);
-            return ServiceResult<ChatbotModelResponseDTO>.Failure($"Error: {e.Message}");
-        }
+            return CreateSuccessResponse(model);
+        }, _unitOfWork,_logger, $"Error retrieving ChatbotModel with ID {id}");
     }
 
     public async Task<ServiceResult<ChatbotModelResponseDTO>> UpdateAsync(Guid id, ChatbotModelUpdateDTO updateDto)
     {
-        if (updateDto == null)
+        if (updateDto is null)
         {
             _logger.LogError("ChatbotModelUpdateDTO is null");
             return ServiceResult<ChatbotModelResponseDTO>.Failure("ChatbotModel data is null");
         }
 
-        try
+        return await ServiceResult<ChatbotModelResponseDTO>.ExecuteWithTransactionAsync(async () =>
         {
-            var existingModel = await _chatbotModelsRepository.GetByIdAsync(id);
-            if (existingModel == null)
+            var existingModel = await _unitOfWork.ChatbotModelsRepository.GetByIdAsync(id);
+            if (existingModel is null)
+            {
                 return ServiceResult<ChatbotModelResponseDTO>.Failure("ChatbotModel not found");
+            }
 
             // Update model properties
-            existingModel.ModelName = updateDto.ModelName;
-            existingModel.PricingTier = updateDto.PricingTier;
-            existingModel.IsAvailableForPaidUsers = updateDto.IsAvailableForPaidUsers;
-
-            await _chatbotModelsRepository.UpdateAsync(existingModel);
+            UpdateModelProperties(existingModel, updateDto);
+            await _unitOfWork.ChatbotModelsRepository.UpdateAsync(existingModel);
 
             // Handle API keys if provided
             if (updateDto.ApiKeys != null)
@@ -130,66 +109,77 @@ public class ChatbotModelsService : IChatbotModelsService
                 {
                     _logger.LogWarning("Failed to update API keys for ChatbotModel {ModelId}: {Message}", 
                         existingModel.Id, apiKeyResult.Message);
+                    return ServiceResult<ChatbotModelResponseDTO>.Failure($"Failed to update API keys: {apiKeyResult.Message}");
                 }
             }
 
-            var dto = ChatbotModelMappingService.ToResponseDTO(existingModel);
-            return dto != null 
-                ? ServiceResult<ChatbotModelResponseDTO>.Success(dto, "ChatbotModel updated successfully")
-                : ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error updating ChatbotModel with ID {Id}", id);
-            return ServiceResult<ChatbotModelResponseDTO>.Failure($"Error updating ChatbotModel: {e.Message}");
-        }
+            return CreateSuccessResponse(existingModel, "ChatbotModel updated successfully");
+        }, _unitOfWork, _logger, $"Error updating ChatbotModel with ID {id}");
     }
 
     public async Task<ServiceResult<bool>> DeleteAsync(Guid id)
     {
-        try
+        return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
         {
+            // Check if model exists
+            var existingModel = await _unitOfWork.ChatbotModelsRepository.GetByIdAsync(id);
+            if (existingModel == null)
+            {
+                return ServiceResult<bool>.Failure("ChatbotModel not found");
+            }
+
             // Delete associated API keys first
             var apiKeyDeleteResult = await _apiKeyService.DeleteApiKeysByModelIdAsync(id);
             if (!apiKeyDeleteResult.IsSuccess)
             {
                 _logger.LogWarning("Failed to delete API keys for ChatbotModel {ModelId}: {Message}", id, apiKeyDeleteResult.Message);
+                return ServiceResult<bool>.Failure($"Failed to delete API keys: {apiKeyDeleteResult.Message}");
             }
 
             // Delete the ChatbotModel
-            var result = await _chatbotModelsRepository.DeleteAsync(id);
-            return result 
-                ? ServiceResult<bool>.Success(true, "ChatbotModel deleted successfully")
-                : ServiceResult<bool>.Failure("ChatbotModel not found");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error deleting ChatbotModel with ID {Id}", id);
-            return ServiceResult<bool>.Failure($"Error deleting ChatbotModel: {e.Message}");
-        }
+            var result = await _unitOfWork.ChatbotModelsRepository.DeleteAsync(id);
+            if (!result)
+            {
+                return ServiceResult<bool>.Failure("Failed to delete ChatbotModel");
+            }
+
+            return ServiceResult<bool>.Success(true, "ChatbotModel deleted successfully");
+        }, _unitOfWork, _logger, $"Error deleting ChatbotModel with ID {id}");
     }
 
     public async Task<ServiceResult<ChatbotModelResponseDTO>> GetPaidChatbotModel()
     {
-        try
+        return await ServiceResult<ChatbotModelResponseDTO>.ExecuteWithErrorHandlingAsync(async () =>
         {
-            var models = await _chatbotModelsRepository.GetPaidUserModelsAsync();
-            var paidModel = models.FirstOrDefault(m => m.IsAvailableForPaidUsers == true);
+            var models = await _unitOfWork.ChatbotModelsRepository.GetAllAsync();
+            var paidModel = models.FirstOrDefault(m => m.IsAvailableForPaidUsers);
             
             if (paidModel == null)
                 return ServiceResult<ChatbotModelResponseDTO>.Failure("PaidChatbotModel not found");
 
-            var response = ChatbotModelMappingService.ToResponseDTO(paidModel);
-            return response != null 
-                ? ServiceResult<ChatbotModelResponseDTO>.Success(response)
-                : ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map paid chatbot model");
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error getting PaidChatbotModel");
-            return ServiceResult<ChatbotModelResponseDTO>.Failure($"Error getting PaidChatbotModel: {e.Message}");
-        }
+            return CreateSuccessResponse(paidModel);
+        }, _unitOfWork,_logger, "Error getting PaidChatbotModel");
     }
+
+    #endregion
+
+    #region Private Helper Methods
+
+    private static void UpdateModelProperties(ChatbotModel existingModel, ChatbotModelUpdateDTO updateDto)
+    {
+        existingModel.ModelName = updateDto.ModelName;
+        existingModel.PricingTier = updateDto.PricingTier;
+        existingModel.IsAvailableForPaidUsers = updateDto.IsAvailableForPaidUsers;
+    }
+
+    private static ServiceResult<ChatbotModelResponseDTO> CreateSuccessResponse(ChatbotModel model, string message = "")
+    {
+        var dto = ChatbotModelMappingService.ToResponseDTO(model);
+        return dto != null 
+            ? ServiceResult<ChatbotModelResponseDTO>.Success(dto, message)
+            : ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
+    }
+
 
     #endregion
 }

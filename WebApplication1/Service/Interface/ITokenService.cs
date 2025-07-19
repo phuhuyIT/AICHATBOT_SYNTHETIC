@@ -8,11 +8,11 @@ namespace WebApplication1.Service.Interface
 {
     public interface ITokenService 
     {
-        public Task<JwtToken> GenerateTokens(HttpContext context, User user);
-        string GenerateAccessToken(User user);
+        public Task<ServiceResult<JwtToken>> GenerateTokens(HttpContext context, User user);
+        Task<ServiceResult<string>> GenerateAccessTokenAsync(User user);
         string GenerateRefreshToken();
-        Task<bool> DeleteRefreshToken(HttpContext context);
-        Task<string> RefreshToken(HttpContext context);
-        bool RevokeToken(HttpContext context, ClaimsPrincipal user);
+        Task<ServiceResult<bool>> DeleteRefreshToken(HttpContext context);
+        Task<ServiceResult<string>> RefreshToken(HttpContext context);
+        ServiceResult<bool> RevokeToken(HttpContext context, ClaimsPrincipal user);
     }
 }
