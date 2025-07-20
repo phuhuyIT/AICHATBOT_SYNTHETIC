@@ -113,20 +113,20 @@ namespace WebApplication1.Service
             }, _unitOfWork, _logger, "Error refreshing token");
         }
 
-        public ServiceResult<bool> RevokeToken(HttpContext context, ClaimsPrincipal user)
+        public async Task<ServiceResult<bool>> RevokeToken(HttpContext context, ClaimsPrincipal user)
         {
-            return ServiceResult<bool>.ExecuteWithErrorHandling(() =>
+            return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var refreshToken = context.Request.Cookies["RefreshToken"];
                 if (string.IsNullOrEmpty(refreshToken))
                 {
-                    return ServiceResult<bool>.Success(false);
+                    throw new Exception("Refresh token not found");
                 }
 
                 var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(userId))
                 {
-                    return ServiceResult<bool>.Success(false);
+                    throw new Exception("User ID not found");
                 }
 
                 // Find and delete refresh token
@@ -152,13 +152,13 @@ namespace WebApplication1.Service
                 var token = context.Request.Cookies["RefreshToken"];
                 if (string.IsNullOrEmpty(token))
                 {
-                    return ServiceResult<bool>.Success(false);
+                    throw new Exception("Refresh token not found");
                 }
 
                 var refreshToken = await FindRefreshTokenAsync(token);
                 if (refreshToken == null)
                 {
-                    return ServiceResult<bool>.Success(false);
+                    throw new Exception("Refresh token not found");
                 }
 
                 // Delete the refresh token
@@ -176,12 +176,14 @@ namespace WebApplication1.Service
             return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 if (string.IsNullOrEmpty(token))
-                    return ServiceResult<bool>.Success(false);
+                    throw new Exception("Refresh token not found");
 
                 var refreshToken = await FindRefreshTokenAsync(token);
                 var isValid = refreshToken != null && refreshToken.ExpiryDate > DateTime.UtcNow;
+                if (!isValid)
+                    throw new Exception("Invalid or expired refresh token");
 
-                return ServiceResult<bool>.Success(isValid);
+                return ServiceResult<bool>.Success(true);
             }, _unitOfWork, _logger, "Error validating refresh token");
         }
 

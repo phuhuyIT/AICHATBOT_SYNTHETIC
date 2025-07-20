@@ -26,8 +26,6 @@ namespace WebApplication1.Service
         public static ServiceResult<T> Failure(string message)
             => new ServiceResult<T>(false, message ?? "Operation failed", default);
 
-        #region Centralized Error and Transaction Handling
-
         /// <summary>
         /// Executes an operation with standardized error handling and logging
         /// </summary>
@@ -89,67 +87,6 @@ namespace WebApplication1.Service
             }
         }
 
-        /// <summary>
-        /// Executes an operation with error handling (synchronous version)
-        /// </summary>
-        public static ServiceResult<TResult> ExecuteWithErrorHandling<TResult>(
-            Func<ServiceResult<TResult>> operation,
-            IUnitOfWork unitOfWork,
-            ILogger logger,
-            string errorMessage)
-        {
-            try
-            {
-                var result = operation();
-                
-                if (result.IsSuccess)
-                {
-                    unitOfWork.SaveChangesAsync().Wait();
-                }
-                
-                return result;
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "{ErrorMessage}", errorMessage);
-                return ServiceResult<TResult>.Failure($"Error: {e.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Executes an operation with transaction management (synchronous version)
-        /// </summary>
-        public static ServiceResult<TResult> ExecuteWithTransaction<TResult>(
-            Func<ServiceResult<TResult>> operation,
-            IUnitOfWork unitOfWork,
-            ILogger logger,
-            string errorMessage)
-        {
-            try
-            {
-                unitOfWork.BeginTransactionAsync().Wait();
-                var result = operation();
-                
-                if (result.IsSuccess)
-                {
-                    unitOfWork.SaveChangesAsync().Wait();
-                    unitOfWork.CommitTransactionAsync().Wait();
-                }
-                else
-                {
-                    unitOfWork.RollbackTransactionAsync().Wait();
-                }
-                
-                return result;
-            }
-            catch (Exception e)
-            {
-                unitOfWork.RollbackTransactionAsync().Wait();
-                logger.LogError(e, "{ErrorMessage}", errorMessage);
-                return ServiceResult<TResult>.Failure($"Error: {e.Message}");
-            }
-        }
-
-        #endregion
+        
     }
 }

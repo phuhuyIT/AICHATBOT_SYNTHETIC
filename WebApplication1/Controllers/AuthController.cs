@@ -171,7 +171,7 @@ namespace WebApplication1.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> RevokeRefreshToken()
         {
-            var revokeResult = _tokenService.RevokeToken(HttpContext, User);
+            var revokeResult = await _tokenService.RevokeToken(HttpContext, User);
             if (!revokeResult.IsSuccess || !revokeResult.Data)
             {
                 return BadRequest(new { success = false, message = "Failed to revoke refresh token" });

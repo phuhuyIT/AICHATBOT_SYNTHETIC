@@ -13,6 +13,6 @@ namespace WebApplication1.Service.Interface
         string GenerateRefreshToken();
         Task<ServiceResult<bool>> DeleteRefreshToken(HttpContext context);
         Task<ServiceResult<string>> RefreshToken(HttpContext context);
-        ServiceResult<bool> RevokeToken(HttpContext context, ClaimsPrincipal user);
+        Task<ServiceResult<bool>> RevokeToken(HttpContext context, ClaimsPrincipal user);
     }
 }
