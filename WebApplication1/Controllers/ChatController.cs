@@ -63,7 +63,7 @@ namespace WebApplication1.Controllers
                     ConversationId = conversationId
                 };
 
-                return Ok(ServiceResult<SendMessageResponse>.Success(response));
+                return Ok(new { success = true, data = response, message = messageResult.Message });
             }
             catch (Exception ex)
             {
@@ -101,7 +101,7 @@ namespace WebApplication1.Controllers
                     MessageTimestamp = m.CreatedAt // Use CreatedAt instead of MessageTimestamp
                 }).ToList();
 
-                return Ok(ServiceResult<IEnumerable<MessageHistory>>.Success(messageHistory));
+                return Ok(new { data = messageHistory });
             }
             catch (Exception ex)
             {
@@ -144,7 +144,7 @@ namespace WebApplication1.Controllers
                     MessageTimestamp = m.CreatedAt
                 }).ToList();
 
-                return Ok(ServiceResult<IEnumerable<MessageHistory>>.Success(messageHistory));
+                return Ok(new { data = messageHistory });
             }
             catch (Exception ex)
             {
@@ -186,7 +186,7 @@ namespace WebApplication1.Controllers
                     IsActive = c.IsActive
                 }).ToList();
 
-                return Ok(ServiceResult<IEnumerable<ConversationSummary>>.Success(conversationSummaries));
+                return Ok(new { success = true, data = conversationSummaries, message = conversationsResult.Message });
             }
             catch (Exception ex)
             {
@@ -215,7 +215,7 @@ namespace WebApplication1.Controllers
                     return BadRequest(conversationResult.Message);
                 }
 
-                return Ok(ServiceResult<object>.Success(new { ConversationId = conversationResult.Data.ConversationId }));
+                return Ok(new { success = true, data = conversationResult.Data, message = conversationResult.Message });    
             }
             catch (Exception ex)
             {
@@ -244,7 +244,7 @@ namespace WebApplication1.Controllers
                     return BadRequest(result.Message);
                 }
 
-                return Ok(ServiceResult<bool>.Success(true, "Conversation ended successfully"));
+                return Ok(new { success = true, message = "Conversation ended successfully" });
             }
             catch (Exception ex)
             {
@@ -273,7 +273,7 @@ namespace WebApplication1.Controllers
                     return BadRequest(result.Message);
                 }
 
-                return Ok(ServiceResult<bool>.Success(true, "Message deleted successfully"));
+                return Ok(new { success = true, message = "Message deleted successfully" });
             }
             catch (Exception ex)
             {
@@ -317,7 +317,7 @@ namespace WebApplication1.Controllers
                     ConversationId = Guid.Empty // Will need to get from branch if needed
                 };
 
-                return Ok(ServiceResult<SendMessageResponse>.Success(response));
+                return Ok(new { success = true, data = response, message = result.Message });
             }
             catch (Exception ex)
             {
@@ -340,7 +340,7 @@ namespace WebApplication1.Controllers
                     return BadRequest(result.Message);
                 }
 
-                return Ok(ServiceResult<IEnumerable<string>>.Success(result.Data));
+                return Ok(new { success = true, data = result.Data, message = result.Message });
             }
             catch (Exception ex)
             {
@@ -356,7 +356,6 @@ namespace WebApplication1.Controllers
 
         private bool IsPaidUser()
         {
-            // You can implement logic to determine if user is paid based on claims or database lookup
             var isPaidClaim = User.FindFirst("IsPaid")?.Value;
             return bool.TryParse(isPaidClaim, out bool isPaid) && isPaid;
         }
