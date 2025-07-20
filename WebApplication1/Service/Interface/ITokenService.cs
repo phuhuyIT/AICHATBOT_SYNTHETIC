@@ -11,7 +11,7 @@ namespace WebApplication1.Service.Interface
         public Task<ServiceResult<JwtToken>> GenerateTokens(HttpContext context, User user);
         Task<ServiceResult<string>> GenerateAccessTokenAsync(User user);
         string GenerateRefreshToken();
-        Task<ServiceResult<bool>> DeleteRefreshToken(HttpContext context);
+        Task<ServiceResult<bool>> DeleteRefreshTokenAsync(HttpContext context);
         Task<ServiceResult<string>> RefreshToken(HttpContext context);
         Task<ServiceResult<bool>> RevokeToken(HttpContext context, ClaimsPrincipal user);
     }

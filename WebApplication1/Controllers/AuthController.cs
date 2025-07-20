@@ -137,7 +137,7 @@ namespace WebApplication1.Controllers
         [Authorize(Roles = "User")]
         public async Task<IActionResult> Logout()
         {
-            var deleteResult = await _tokenService.DeleteRefreshToken(HttpContext);
+            var deleteResult = await _tokenService.DeleteRefreshTokenAsync(HttpContext);
             if (!deleteResult.IsSuccess || !deleteResult.Data)
             {
                 return BadRequest(new { success = false, message = "Failed to delete refresh token" });

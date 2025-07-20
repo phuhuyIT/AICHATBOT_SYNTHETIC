@@ -22,38 +22,55 @@ namespace WebApplication1.Service
             _emailSettings = emailSettings.Value;
         }
 
-        public async Task SendEmailAsync(string email, string subject, string message)
+        public async Task<ServiceResult<bool>> SendEmailAsync(string email, string subject, string message)
         {
-            var _email = new MimeMessage();
-            _email.From.Add(MailboxAddress.Parse(_emailSettings.Username));
-            _email.To.Add(MailboxAddress.Parse(email));
-            _email.Subject = subject;
-            _email.Body = new TextPart(TextFormat.Html) { Text = message };
-
-            using (var smtp = new SmtpClient())
+            try
             {
-                // Connect with STARTTLS; adjust SecureSocketOptions as needed.
-                await smtp.ConnectAsync(_emailSettings.Host, _emailSettings.Port, SecureSocketOptions.StartTls);
-                await smtp.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password);
-                await smtp.SendAsync(_email);
-                await smtp.DisconnectAsync(true);
+                var _email = new MimeMessage();
+                _email.From.Add(MailboxAddress.Parse(_emailSettings.Username));
+                _email.To.Add(MailboxAddress.Parse(email));
+                _email.Subject = subject;
+                _email.Body = new TextPart(TextFormat.Html) { Text = message };
+
+                using (var smtp = new SmtpClient())
+                {
+                    // Connect with STARTTLS; adjust SecureSocketOptions as needed.
+                    await smtp.ConnectAsync(_emailSettings.Host, _emailSettings.Port, SecureSocketOptions.StartTls);
+                    await smtp.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password);
+                    await smtp.SendAsync(_email);
+                    await smtp.DisconnectAsync(true);
+                }
+                
+                return ServiceResult<bool>.Success(true, "Email sent successfully");
+            }
+            catch (Exception ex)
+            {
+                return ServiceResult<bool>.Failure($"Failed to send email: {ex.Message}");
             }
         }
-        public async Task<string> RenderTemplateAsync(string templateName, IDictionary<string, string> tokens)
+        
+        public async Task<ServiceResult<string>> RenderTemplateAsync(string templateName, IDictionary<string, string> tokens)
         {
-            // Retrieve the raw template
-            var template = await _templateRepository.GetTemplateAsync(templateName);
-            if (string.IsNullOrWhiteSpace(template))
+            try
             {
-                throw new Exception($"Template '{templateName}' not found.");
-            }
+                // Retrieve the raw template
+                var template = await _templateRepository.GetTemplateAsync(templateName);
+                if (string.IsNullOrWhiteSpace(template))
+                {
+                    return ServiceResult<string>.Failure($"Template '{templateName}' not found.");
+                }
 
-            // Replace each token in the template (e.g., {{USER_NAME}})
-            foreach (var token in tokens)
-            {
-                template = template.Replace($"{{{{{token.Key}}}}}", token.Value);
+                // Replace each token in the template (e.g., {{USER_NAME}})
+                foreach (var token in tokens)
+                {
+                    template = template.Replace($"{{{{{token.Key}}}}}", token.Value);
+                }
+                return ServiceResult<string>.Success(template);
             }
-            return template;
+            catch (Exception ex)
+            {
+                return ServiceResult<string>.Failure($"Failed to render template: {ex.Message}");
+            }
         }
     }
 }
