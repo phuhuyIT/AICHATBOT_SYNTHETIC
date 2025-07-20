@@ -77,7 +77,7 @@ namespace WebApplication1.Service
                 var refreshToken = context.Request.Cookies["RefreshToken"];
                 if (string.IsNullOrEmpty(refreshToken))
                 {
-                    throw new UnauthorizedAccessException("Refresh token not found");
+                    return ServiceResult<string>.Failure("Refresh token not found");
                 }
 
                 // For now, we'll handle refresh tokens through a direct repository approach
@@ -86,18 +86,22 @@ namespace WebApplication1.Service
                 
                 if (tokenEntity == null || tokenEntity.ExpiryDate <= DateTime.UtcNow)
                 {
-                    throw new UnauthorizedAccessException("Invalid or expired refresh token");
+                    return ServiceResult<string>.Failure("Invalid or expired refresh token");
                 }
 
                 // Get user and generate new access token
                 var user = await _userManager.FindByIdAsync(tokenEntity.UserId);
                 if (user == null)
                 {
-                    throw new UnauthorizedAccessException("User not found");
+                    return ServiceResult<string>.Failure("User not found");
                 }
 
                 // Generate new access token
                 var newAccessToken = await GenerateAccessTokenAsync(user);
+                if (!newAccessToken.IsSuccess)
+                {
+                    return ServiceResult<string>.Failure($"Failed to generate access token: {newAccessToken.Message}");
+                }
 
                 // Generate new refresh token and update the database
                 var newRefreshToken = GenerateRefreshToken();
@@ -120,21 +124,21 @@ namespace WebApplication1.Service
                 var refreshToken = context.Request.Cookies["RefreshToken"];
                 if (string.IsNullOrEmpty(refreshToken))
                 {
-                    throw new Exception("Refresh token not found");
+                    return ServiceResult<bool>.Failure("Refresh token not found");
                 }
 
                 var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(userId))
                 {
-                    throw new Exception("User ID not found");
+                    return ServiceResult<bool>.Failure("User ID not found");
                 }
 
                 // Find and delete refresh token
-                var tokenEntity = FindRefreshTokenAsync(refreshToken).Result;
+                var tokenEntity = await FindRefreshTokenAsync(refreshToken);
                 
                 if (tokenEntity != null && tokenEntity.UserId == userId)
                 {
-                    DeleteRefreshTokenAsync(tokenEntity.RefreshTokenID).Wait();
+                    await _unitOfWork.RefreshTokenRepository.DeleteAsync(tokenEntity.RefreshTokenID);;
                 }
 
                 // Remove the cookie
@@ -145,24 +149,24 @@ namespace WebApplication1.Service
             }, _unitOfWork, _logger, "Error revoking token");
         }
 
-        public async Task<ServiceResult<bool>> DeleteRefreshToken(HttpContext context)
+        public async Task<ServiceResult<bool>> DeleteRefreshTokenAsync(HttpContext context)
         {
-            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+            return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 var token = context.Request.Cookies["RefreshToken"];
                 if (string.IsNullOrEmpty(token))
                 {
-                    throw new Exception("Refresh token not found");
+                    return ServiceResult<bool>.Failure("Refresh token not found");
                 }
 
                 var refreshToken = await FindRefreshTokenAsync(token);
                 if (refreshToken == null)
                 {
-                    throw new Exception("Refresh token not found");
+                    return ServiceResult<bool>.Failure("Refresh token not found");
                 }
 
                 // Delete the refresh token
-                await DeleteRefreshTokenAsync(refreshToken.RefreshTokenID);
+                await _unitOfWork.RefreshTokenRepository.DeleteAsync(refreshToken.RefreshTokenID);
 
                 // Remove the cookie
                 context.Response.Cookies.Delete("RefreshToken");
@@ -176,12 +180,12 @@ namespace WebApplication1.Service
             return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
                 if (string.IsNullOrEmpty(token))
-                    throw new Exception("Refresh token not found");
+                    return ServiceResult<bool>.Failure("Refresh token not found");
 
                 var refreshToken = await FindRefreshTokenAsync(token);
                 var isValid = refreshToken != null && refreshToken.ExpiryDate > DateTime.UtcNow;
                 if (!isValid)
-                    throw new Exception("Invalid or expired refresh token");
+                    return ServiceResult<bool>.Failure("Invalid or expired refresh token");
 
                 return ServiceResult<bool>.Success(true);
             }, _unitOfWork, _logger, "Error validating refresh token");
@@ -236,11 +240,7 @@ namespace WebApplication1.Service
         {
             await _unitOfWork.RefreshTokenRepository.UpdateAsync(tokenEntity);
         }
-
-        private async Task DeleteRefreshTokenAsync(Guid tokenId)
-        {
-            await _unitOfWork.RefreshTokenRepository.DeleteAsync(tokenId);
-        }
+        
 
         private async Task AddRefreshTokenAsync(RefreshToken tokenEntity)
         {

@@ -44,7 +44,7 @@ namespace WebApplication1
                 });
             });
             // Add Identity services
-            builder.Services.AddIdentity<User, IdentityRole>(options =>
+            builder.Services.AddIdentity<User, Role>(options =>
             {
                 // Identity configuration (like password rules, etc.)
                 options.SignIn.RequireConfirmedEmail = true;
@@ -87,6 +87,7 @@ namespace WebApplication1
             builder.Services.AddScoped<IEmailSender, EmailSenderService>();
             builder.Services.AddScoped<IChatbotModelsService, ChatbotModelsService>();
             builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+            builder.Services.AddScoped<IRoleService, RoleService>();
             
             // Register Chat Services
             builder.Services.AddScoped<IChatService, ChatService>();
