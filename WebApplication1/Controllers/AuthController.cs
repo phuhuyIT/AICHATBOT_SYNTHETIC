@@ -1,100 +1,81 @@
-﻿using Azure;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Data;
 using WebApplication1.DTO.Auth;
 using WebApplication1.Models;
+using WebApplication1.Service;
 using WebApplication1.Service.Interface;
 
 namespace WebApplication1.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthController : ControllerBase
+    public class AuthController(
+        UserManager<User> userManager,
+        ITokenService tokenService,
+        IAuthService authService,
+        ILogger<AuthController> logger) : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<User> _userManager;
-        private readonly ITokenService _tokenService;
-        private readonly IAuthService _authService;
-        private readonly ILogger<AuthController> _logger;
+        private readonly UserManager<User> _userManager = userManager;
+        private readonly ITokenService _tokenService = tokenService;
+        private readonly IAuthService _authService = authService;
+        private readonly ILogger<AuthController> _logger = logger;
 
-        public AuthController(UserManager<User> userManager ,ApplicationDbContext context, ITokenService tokenService, IAuthService authService, ILogger<AuthController> logger)
-        {
-            _userManager = userManager;
-            _context = context;
-            _tokenService = tokenService;
-            _authService = authService;
-            _logger = logger;
-        }
         /// <summary>
         /// Register a new user
         /// </summary>
         /// <param name="model"></param>
         /// <returns></returns>
-        // Register User
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO model)
         {
-            try
+            if (!ModelState.IsValid)
             {
-                // Create the new user
-                var user = new User
-                {
-                    UserName = model.Username,
-                    Email = model.Email,
-                    IsPaidUser = false,
-                    Balance = 0
-                };
-                var result = await _authService.RegisterAsync(model, user);
-                //var jwtToken = await _tokenService.GenerateTokens(HttpContext, user);
-                return Ok("Please check your email");  // Set AccessToken and RefreshToken in cookies
+                return BadRequest(new { success = false, message = "Invalid model state", errors = ModelState });
             }
-            catch (Exception message)
+
+            // Create the new user
+            var user = new User
             {
-                return BadRequest(message.Message);
+                UserName = model.Username,
+                Email = model.Email,
+                IsPaidUser = false,
+                Balance = 0
+            };
+
+            var result = await _authService.RegisterAsync(model, user);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(new { success = false, message = result.Message });
             }
+
+            return Ok(new { success = true, data = result.Data, message = result.Message });
         }
-        // Confirm Email
+
+        /// <summary>
+        /// Confirm Email
+        /// </summary>
         [HttpGet("confirmemail")]
         public async Task<IActionResult> ConfirmEmail(string email, string token)
         {
             _logger.LogInformation("ConfirmEmail request received for email: {Email}", email);
 
-            try
+            var result = await _authService.ConfirmEmailAsync(email, token);
+            if (!result.IsSuccess)
             {
-                var result = await _authService.ConfirmEmailAsync(email, token);
-                if (result)
-                {
-                    _logger.LogInformation("Email confirmation successful for: {Email}", email);
-                    return Ok(new { message = "Đăng ký thành công!", success = true });
-                }
-                
-                _logger.LogWarning("Email confirmation failed for: {Email} - Unknown error", email);
-                return BadRequest(new { 
-                    message = "Xác nhận email thất bại!",
-                    canResend = true,
-                    email = email
-                });
+                _logger.LogWarning("Email confirmation failed for: {Email} - {Message}", email, result.Message);
+                return BadRequest(new { success = false, message = result.Message });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during email confirmation for: {Email}", email);
-                
-                // Check if it's a token-related error to suggest resending
-                bool canResend = ex.Message.Contains("Token") || ex.Message.Contains("hết hạn") || ex.Message.Contains("không hợp lệ");
-                
-                return BadRequest(new { 
-                    message = $"Xác nhận email thất bại: {ex.Message}",
-                    canResend = canResend,
-                    email = email
-                });
-            }
+            
+            _logger.LogInformation("Email confirmation successful for: {Email}", email);
+            return Ok(new { success = true, message = "Email xác nhận thành công!" });
         }
 
-        // Resend Email Confirmation
+        /// <summary>
+        /// Resend Email Confirmation
+        /// </summary>
         [HttpPost("resend-email-confirmation")]
         public async Task<IActionResult> ResendEmailConfirmation([FromBody] ResendEmailConfirmationDTO model)
         {
@@ -103,96 +84,100 @@ namespace WebApplication1.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("ResendEmailConfirmation called with invalid model state for email: {Email}", model.Email);
-                return BadRequest(ModelState);
+                return BadRequest(new { success = false, message = "Invalid model state" });
             }
 
-            try
+            var result = await _authService.ResendEmailConfirmationAsync(model.Email);
+            if (!result.IsSuccess)
             {
-                var result = await _authService.ResendEmailConfirmationAsync(model.Email);
-                if (result)
-                {
-                    _logger.LogInformation("Email confirmation resent successfully for: {Email}", model.Email);
-                    return Ok(new { 
-                        message = "Email xác nhận đã được gửi lại! Vui lòng kiểm tra hộp thư của bạn.",
-                        success = true
-                    });
-                }
-                
-                _logger.LogWarning("Failed to resend email confirmation for: {Email}", model.Email);
-                return BadRequest(new { message = "Không thể gửi lại email xác nhận!" });
+                _logger.LogWarning("Failed to resend email confirmation for: {Email} - {Message}", model.Email, result.Message);
+                return BadRequest(new { success = false, message = result.Message });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during resend email confirmation for: {Email}", model.Email);
-                return BadRequest(new { message = $"Lỗi khi gửi lại email xác nhận: {ex.Message}" });
-            }
+            
+            _logger.LogInformation("Email confirmation resent successfully for: {Email}", model.Email);
+            return Ok(new { success = true, message = "Gửi email xác nhận thành công!" });
         }
 
-        // Login action: generate both Access Token and Refresh Token
+        /// <summary>
+        /// Login action: generate both Access Token and Refresh Token
+        /// </summary>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest model)
         {
-            JwtToken jwtToken;
-            try
+            if (!ModelState.IsValid)
             {
-                bool result = await _authService.LoginAsync(model);
-                var user = await _userManager.FindByEmailAsync(model.Email);
-                jwtToken = (await _tokenService.GenerateTokens(HttpContext, user)).Data;
+                return BadRequest(new { success = false, message = "Invalid model state" });
             }
-            catch (Exception ex)
+
+            var loginResult = await _authService.LoginAsync(model);
+            if (!loginResult.IsSuccess)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new { success = false, message = loginResult.Message });
             }
-            return Ok(jwtToken);  // Set AccessToken and RefreshToken in cookies
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                return BadRequest(new { success = false, message = "User not found" });
+            }
+
+            var tokenResult = await _tokenService.GenerateTokens(HttpContext, user);
+            if (!tokenResult.IsSuccess || tokenResult.Data == null)
+            {
+                return BadRequest(new { success = false, message = "Failed to generate tokens" });
+            }
+
+            return Ok(new { success = true, data = tokenResult.Data, message = "Login successful" });
         }
 
-
-        // Logout action: clear the Refresh Token cookie
+        /// <summary>
+        /// Logout action: clear the Refresh Token cookie
+        /// </summary>
         [HttpPost("logout")]
-        [Authorize(Roles ="User")]
+        [Authorize(Roles = "User")]
         public async Task<IActionResult> Logout()
         {
-            // delete refresh token from database
-            bool isDeleted = (await _tokenService.DeleteRefreshToken(HttpContext)).Data;
-            if (!isDeleted)
+            var deleteResult = await _tokenService.DeleteRefreshToken(HttpContext);
+            if (!deleteResult.IsSuccess || !deleteResult.Data)
             {
-                return BadRequest("Failed to revoke refresh token.");
+                return BadRequest(new { success = false, message = "Failed to delete refresh token" });
             }
-            // clear cookies
-            Response.Cookies.Delete("refreshToken", new CookieOptions { HttpOnly = true, Secure = true }); // Clear the refresh token cookie
 
-            return Ok("Logged out successfully");
+            // clear cookies
+            Response.Cookies.Delete("refreshToken", new CookieOptions { HttpOnly = true, Secure = true });
+
+            return Ok(new { success = true, message = "Logout successful" });
         }
 
-        // Refresh Access Token using Refresh Token
+        /// <summary>
+        /// Refresh Access Token using Refresh Token
+        /// </summary>
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken()
         {
-            try
+            var tokenResult = await _tokenService.RefreshToken(HttpContext);
+            if (!tokenResult.IsSuccess || tokenResult.Data == null)
             {
-                var token = await _tokenService.RefreshToken(HttpContext);
-                if (token == null)
-                {
-                    return Unauthorized("Failed to refresh token. You must log out!");
-                }
-                return Ok(token);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
+                return Unauthorized(new { success = false, message = "Failed to refresh token" });
             }
 
+            return Ok(new { success = true, data = tokenResult.Data, message = "Token refreshed successfully" });
         }
+
+        /// <summary>
+        /// Revoke refresh token
+        /// </summary>
         [HttpPost("revoke")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> RevokeRefreshToken()
-        {   
-            if(! _tokenService.RevokeToken(HttpContext, User).Data )
+        {
+            var revokeResult = _tokenService.RevokeToken(HttpContext, User);
+            if (!revokeResult.IsSuccess || !revokeResult.Data)
             {
-                return BadRequest("Failed to revoke refresh token.");
+                return BadRequest(new { success = false, message = "Failed to revoke refresh token" });
             }
-            return Ok("Refresh token revoked successfully.");
-        }
 
+            return Ok(new { success = true, message = "Refresh token revoked successfully" });
+        }
     }
 }

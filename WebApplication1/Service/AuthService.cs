@@ -28,7 +28,7 @@ namespace WebApplication1.Service
             _logger = logger;
         }
 
-        public async Task<bool> LoginAsync(LoginRequest loginDTO)
+        public async Task<ServiceResult<bool>> LoginAsync(LoginRequest loginDTO)
         {
             return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
@@ -40,10 +40,10 @@ namespace WebApplication1.Service
                     throw new Exception("Sai mật khẩu.");
                 }
                 return ServiceResult<bool>.Success(true);
-            }, _unitOfWork,_logger, $"Error during login for email {loginDTO.Email}").ContinueWith(t => t.Result.Data);
+            }, _unitOfWork,_logger, $"Error during login for email {loginDTO.Email}");
         }
 
-        public async Task<IdentityResult?> RegisterAsync(RegisterDTO registerDTO, User user)
+        public async Task<ServiceResult<IdentityResult>> RegisterAsync(RegisterDTO registerDTO, User user)
         {
             return await ServiceResult<IdentityResult>.ExecuteWithTransactionAsync(async () =>
             {
@@ -68,10 +68,10 @@ namespace WebApplication1.Service
                 await SendEmailConfirmationWithErrorHandling(user);
 
                 return ServiceResult<IdentityResult>.Success(result);
-            }, _unitOfWork, _logger, $"Error registering user with email {registerDTO.Email}").ContinueWith(t => t.Result.Data);
+            }, _unitOfWork, _logger, $"Error registering user with email {registerDTO.Email}");
         }
 
-        public async Task<bool> ConfirmEmailAsync(string email, string token)
+        public async Task<ServiceResult<bool>> ConfirmEmailAsync(string email, string token)
         {
             return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
@@ -102,10 +102,10 @@ namespace WebApplication1.Service
 
                 _logger.LogInformation("Email confirmation successful for user: {Email}, UserId: {UserId}", email, user.Id);
                 return ServiceResult<bool>.Success(true);
-            },_unitOfWork ,_logger, $"Error confirming email for {email}").ContinueWith(t => t.Result.Data);
+            },_unitOfWork ,_logger, $"Error confirming email for {email}");
         }
 
-        public async Task<bool> ResendEmailConfirmationAsync(string email)
+        public async Task<ServiceResult<bool>> ResendEmailConfirmationAsync(string email)
         {
             return await ServiceResult<bool>.ExecuteWithErrorHandlingAsync(async () =>
             {
@@ -121,7 +121,7 @@ namespace WebApplication1.Service
                 await SendEmailConfirmationAsync(user, "Confirm your email - Resent");
                 _logger.LogInformation("Email confirmation resent successfully for user: {Email}, UserId: {UserId}", email, user.Id);
                 return ServiceResult<bool>.Success(true);
-            }, _unitOfWork,_logger, $"Error resending email confirmation for {email}").ContinueWith(t => t.Result.Data);
+            }, _unitOfWork,_logger, $"Error resending email confirmation for {email}");
         }
 
         #region Private Helper Methods

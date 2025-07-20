@@ -7,9 +7,9 @@ namespace WebApplication1.Service.Interface
 {
     public interface IAuthService
     {
-        Task<IdentityResult?> RegisterAsync(RegisterDTO registerDTO, User user);
-        Task<bool> LoginAsync(LoginRequest loginDTO);
-        Task<bool> ConfirmEmailAsync(string email, string token);
-        Task<bool> ResendEmailConfirmationAsync(string email);
+        Task<ServiceResult<IdentityResult>> RegisterAsync(RegisterDTO registerDTO, User user);
+        Task<ServiceResult<bool>> LoginAsync(LoginRequest loginDTO);
+        Task<ServiceResult<bool>> ConfirmEmailAsync(string email, string token);
+        Task<ServiceResult<bool>> ResendEmailConfirmationAsync(string email);
     }
 }
