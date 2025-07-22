@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Service.Interface;
 using WebApplication1.DTO.Role;
 
@@ -6,6 +7,7 @@ namespace WebApplication1.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize(Roles = "Admin")]
 public class RoleController : ControllerBase
 {
     private readonly IRoleService _roleService;
