@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Service.Interface;
 using WebApplication1.DTO.ChatbotModel;
@@ -19,7 +20,21 @@ public class ChatBotModelsController : ControllerBase
 
     #region CRUD Operations
 
+/* <<<<<<<<<<<<<<  ✨ Windsurf Command ⭐ >>>>>>>>>>>>>>>> */
+    /// <summary>
+    /// Get all AI models from the database.
+    /// </summary>
+    /// <returns>A JSON object containing the list of AI models, or an error message.</returns>
+    /// <example>
+    /// {
+    ///     "success": true,
+    ///     "data": [...],
+    ///     "message": "All models retrieved successfully"
+    /// }
+    /// </example>
+/* <<<<<<<<<<  175822bc-3ef1-4488-aeea-73bbb39c166f  >>>>>>>>>>> */
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllModels()
     {
         try
@@ -60,6 +75,7 @@ public class ChatBotModelsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> CreateModel([FromBody] ChatbotModelCreateDTO modelDto)
     {
         try
@@ -87,6 +103,7 @@ public class ChatBotModelsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> UpdateModel(Guid id, [FromBody] ChatbotModelUpdateDTO modelDto)
     {
         try
@@ -118,6 +135,7 @@ public class ChatBotModelsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> DeleteModel(Guid id)
     {
         try

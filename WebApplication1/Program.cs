@@ -18,7 +18,7 @@ namespace WebApplication1
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +28,7 @@ namespace WebApplication1
 
             // Register the DbContext with the connection string
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnectionString")));
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnectionString"), sqloptions => sqloptions.UseHierarchyId()));
             var jwtSettings = builder.Configuration.GetSection("Jwt");
             var secretKey = jwtSettings.GetValue<string>("Secret");
             // Add services to the container.
@@ -79,9 +79,16 @@ namespace WebApplication1
             });
             //Bind EmailSettings
             builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Smtp"));
+            builder.Services.Configure<DefaultUsersSettings>(builder.Configuration.GetSection(DefaultUsersSettings.SectionName));
             builder.Services.AddTransient<IUserTwoFactorTokenProvider<User>, DataProtectorTokenProvider<User>>();
             // Register services
             builder.Services.AddControllers();
+            
+            // Register Audit Services
+            builder.Services.AddHttpContextAccessor(); // Required for accessing current user context
+            builder.Services.AddScoped<IAuditService, AuditService>();
+            builder.Services.AddScoped<IDatabaseSeederService, DatabaseSeederService>();
+
             builder.Services.AddScoped<ITokenService, TokenService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IEmailSender, EmailSenderService>();
@@ -141,9 +148,7 @@ namespace WebApplication1
                 });
             });
 
-
-
-
+            
             var app = builder.Build();
             app.UseCors("AllowReactApp");
             // Map routes/UI, etc.
@@ -153,7 +158,12 @@ namespace WebApplication1
                 // The default HSTS value is 30 days.
                 app.UseHsts();
             }
-
+            // Seed the system user and admin user on application startup
+            using (var scope = app.Services.CreateScope())
+            {
+                var seederService = scope.ServiceProvider.GetRequiredService<IDatabaseSeederService>();
+                await seederService.SeedAllAsync();
+            }
             // Enable Swagger UI
             if (app.Environment.IsDevelopment())
             {

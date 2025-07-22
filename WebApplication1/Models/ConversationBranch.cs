@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace WebApplication1.Models;
 
-public partial class ConversationBranch
+public partial class ConversationBranch : AuditableEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -26,9 +26,6 @@ public partial class ConversationBranch
 
     // running summary
     public string? Summary { get; set; }
-
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // optimistic‑concurrency token
     [Timestamp]

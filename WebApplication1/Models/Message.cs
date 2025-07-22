@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication1.Models;
 
-public partial class Message
+public partial class Message : AuditableEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -34,9 +34,6 @@ public partial class Message
     // optional embedding for RAG (OpenAI 1536‑float → byte[] serialized)
     [Column(TypeName = "varbinary(max)")]
     public byte[]? Embedding { get; set; }
-
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     [Timestamp]
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();

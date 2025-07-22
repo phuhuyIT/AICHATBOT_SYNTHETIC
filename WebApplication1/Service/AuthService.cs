@@ -37,6 +37,11 @@ namespace WebApplication1.Service
                 {
                     return ServiceResult<bool>.Failure(userResult.Message);
                 }
+                //check confirmed email
+                if (!userResult.Data!.EmailConfirmed)
+                {
+                    return ServiceResult<bool>.Failure("Email chưa xác nhận. Vui lòng kiểm tra email.");
+                }
                 
                 var user = userResult.Data!;
                 var result = await _userManager.CheckPasswordAsync(user, loginDTO.Password);
@@ -71,8 +76,9 @@ namespace WebApplication1.Service
 
                 // Send email after successful user creation
                 await SendEmailConfirmationWithErrorHandling(user);
+                await SendEmailConfirmationWithErrorHandling(user);
 
-                return ServiceResult<IdentityResult>.Success(result);
+                return ServiceResult<IdentityResult>.Success(result, "User created successfully. Please check your email for confirmation.");
             }, _unitOfWork, _logger, $"Error registering user with email {registerDTO.Email}");
         }
 

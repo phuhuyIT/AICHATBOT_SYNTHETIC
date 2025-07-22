@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication1.Models
 {
-    public class Transaction
+    public class Transaction : AuditableEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -13,7 +13,6 @@ namespace WebApplication1.Models
         public DateTime TransactionDate { get; set; }
         public string TransactionType { get; set; } = null!;
         public bool IsActive { get; set; } = true;
-        public DateTime? UpdatedAt { get; set; }
         public virtual User? User { get; set; }
     }
 }

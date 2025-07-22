@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication1.Models;
 
-public partial class ChatBotApiKey
+public partial class ChatBotApiKey : AuditableEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -17,8 +17,6 @@ public partial class ChatBotApiKey
 
     public string ServiceName { get; set; } = null!;
 
-    public DateTime CreatedAt { get; set; }
-
     public string? Setting { get; set; }
 
     public string Usage { get; set; } = null!;
@@ -27,8 +25,6 @@ public partial class ChatBotApiKey
     public Guid ChatbotModelId { get; set; }
 
     public bool IsActive { get; set; } = true;
-
-    public DateTime? UpdatedAt { get; set; }
     
     public virtual ChatbotModel? ChatbotModel { get; set; }
     public virtual User? User { get; set; }

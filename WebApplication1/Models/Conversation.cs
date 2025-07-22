@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication1.Models;
 
-public partial class Conversation
+public partial class Conversation : AuditableEntity
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -18,9 +18,7 @@ public partial class Conversation
     public DateTime? EndedAt { get; set; }
     public bool IsPaidUser { get; set; }
     public bool IsActive { get; set; } = true;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public virtual ICollection<ConversationBranch> Branches { get; set; } = new HashSet<ConversationBranch>();
     public virtual User User { get; set; } = null!;
 }
-

@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApplication1.Models
 {
-    public class UsageLog
+    public class UsageLog : AuditableEntity
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -13,7 +13,6 @@ namespace WebApplication1.Models
         public DateTime UsageDate { get; set; }
         public Double UsageAmount { get; set; }
         public bool IsActive { get; set; } = true;
-        public DateTime? UpdatedAt { get; set; }
         public virtual User? User { get; set; }
         public virtual ChatbotModel? ChatbotModel { get; set; }
     }

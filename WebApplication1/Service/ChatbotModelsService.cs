@@ -160,6 +160,7 @@ public class ChatbotModelsService : IChatbotModelsService
             return CreateSuccessResponse(paidModel);
         }, _unitOfWork,_logger, "Error getting PaidChatbotModel");
     }
+    // get
 
     #endregion
 

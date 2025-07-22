@@ -10,6 +10,7 @@ public partial class User : IdentityUser
     public decimal? Balance { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime? UpdatedAt { get; set; }
+    public DateTime? CreatedAt { get; set; }
     // JSON profile (preferences, timezone, language…)
     [Column(TypeName = "nvarchar(max)")]
     public string? ProfileJson { get; set; }

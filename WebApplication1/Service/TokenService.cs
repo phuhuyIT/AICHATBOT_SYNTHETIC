@@ -201,7 +201,6 @@ namespace WebApplication1.Service
                 UserId = userId,
                 Token = refreshToken,
                 ExpiryDate = DateTime.UtcNow.AddDays(expirationDays),
-                Created = DateTime.UtcNow,
             };
         }
 
