@@ -34,6 +34,8 @@ public partial class Message : AuditableEntity
     // optional embedding for RAG (OpenAI 1536‑float → byte[] serialized)
     [Column(TypeName = "varbinary(max)")]
     public byte[]? Embedding { get; set; }
+    
+    public bool IsActive { get; set; } = true;
 
     [Timestamp]
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();

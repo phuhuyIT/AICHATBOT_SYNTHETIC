@@ -19,22 +19,8 @@ public class ChatBotModelsController : ControllerBase
     }
 
     #region CRUD Operations
-
-/* <<<<<<<<<<<<<<  ✨ Windsurf Command ⭐ >>>>>>>>>>>>>>>> */
-    /// <summary>
-    /// Get all AI models from the database.
-    /// </summary>
-    /// <returns>A JSON object containing the list of AI models, or an error message.</returns>
-    /// <example>
-    /// {
-    ///     "success": true,
-    ///     "data": [...],
-    ///     "message": "All models retrieved successfully"
-    /// }
-    /// </example>
-/* <<<<<<<<<<  175822bc-3ef1-4488-aeea-73bbb39c166f  >>>>>>>>>>> */
+    
     [HttpGet]
-    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllModels()
     {
         try
@@ -134,8 +120,8 @@ public class ChatBotModelsController : ControllerBase
         }
     }
 
-    [HttpDelete("{id}")]
-    [Authorize]
+    [HttpDelete("/thanos-delete/{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteModel(Guid id)
     {
         try
@@ -198,6 +184,73 @@ public class ChatBotModelsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in GetPaidUserModels");
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    #endregion
+
+    #region Soft Delete Operations
+
+    [HttpDelete("{id}/soft")]
+    public async Task<IActionResult> SoftDeleteModel(Guid id)
+    {
+        try
+        {
+            var result = await _chatbotService.SoftDeleteAsync(id);
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, message = result.Message });
+            }
+            
+            return NotFound(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in SoftDeleteModel for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    [HttpPatch("{id}/restore")]
+    public async Task<IActionResult> RestoreModel(Guid id)
+    {
+        try
+        {
+            var result = await _chatbotService.RestoreAsync(id);
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, message = result.Message });
+            }
+            
+            return NotFound(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in RestoreModel for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    [HttpGet("deleted")]
+    public async Task<IActionResult> GetDeletedModels()
+    {
+        try
+        {
+            var result = await _chatbotService.GetDeletedAsync();
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetDeletedModels");
             return StatusCode(500, new { success = false, message = "Internal server error" });
         }
     }

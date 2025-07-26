@@ -231,6 +231,100 @@ public class RoleService : IRoleService
 
     #endregion
 
+    #region Soft Delete Methods
+
+    public async Task<ServiceResult<bool>> SoftDeleteAsync(Guid id)
+    {
+        try
+        {
+            var role = await _roleManager.FindByIdAsync(id.ToString());
+            if (role == null)
+            {
+                return ServiceResult<bool>.Failure("Role not found");
+            }
+
+            // Soft delete by setting IsActive = false
+            role.IsActive = false;
+            role.UpdatedAt = DateTime.UtcNow;
+
+            var result = await _roleManager.UpdateAsync(role);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogError("Failed to soft delete role: {Errors}", errors);
+                return ServiceResult<bool>.Failure($"Failed to soft delete role: {errors}");
+            }
+
+            _logger.LogInformation("Role {RoleId} soft deleted successfully", id);
+            return ServiceResult<bool>.Success(true, "Role soft deleted successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error soft deleting role with ID {RoleId}", id);
+            return ServiceResult<bool>.Failure("Failed to soft delete role");
+        }
+    }
+
+    public async Task<ServiceResult<bool>> RestoreAsync(Guid id)
+    {
+        try
+        {
+            var role = await _roleManager.FindByIdAsync(id.ToString());
+            if (role == null)
+            {
+                return ServiceResult<bool>.Failure("Role not found");
+            }
+
+            // Restore by setting IsActive = true
+            role.IsActive = true;
+            role.UpdatedAt = DateTime.UtcNow;
+
+            var result = await _roleManager.UpdateAsync(role);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                _logger.LogError("Failed to restore role: {Errors}", errors);
+                return ServiceResult<bool>.Failure($"Failed to restore role: {errors}");
+            }
+
+            _logger.LogInformation("Role {RoleId} restored successfully", id);
+            return ServiceResult<bool>.Success(true, "Role restored successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error restoring role with ID {RoleId}", id);
+            return ServiceResult<bool>.Failure("Failed to restore role");
+        }
+    }
+
+    public async Task<ServiceResult<IEnumerable<RoleResponseDTO>>> GetDeletedAsync()
+    {
+        try
+        {
+            var deletedRoles = _roleManager.Roles.Where(r => !r.IsActive).ToList();
+            var roleDtos = deletedRoles.Select(role => new RoleResponseDTO
+            {
+                Id = role.Id,
+                Name = role.Name!,
+                Description = role.Description,
+                IsActive = role.IsActive,
+                CreatedAt = role.CreatedAt,
+                UpdatedAt = role.UpdatedAt,
+                CreatedBy = role.CreatedBy,
+                UpdatedBy = role.UpdatedBy
+            }).ToList();
+
+            return ServiceResult<IEnumerable<RoleResponseDTO>>.Success(roleDtos, "Deleted roles retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving deleted roles");
+            return ServiceResult<IEnumerable<RoleResponseDTO>>.Failure("Failed to retrieve deleted roles");
+        }
+    }
+
+    #endregion
+
     #region Additional Methods
 
     public async Task<ServiceResult<IEnumerable<RoleResponseDTO>>> GetActiveRolesAsync()

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebApplication1.DTO.ApiKey;
 using WebApplication1.Service.Interface;
@@ -6,6 +7,7 @@ namespace WebApplication1.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class ApiKeyController : ControllerBase
     {
         private readonly IApiKeyService _apiKeyService;
@@ -118,6 +120,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteApiKey(Guid id)
         {
             try
@@ -404,6 +407,73 @@ namespace WebApplication1.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in GetApiKeyForModel");
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        #endregion
+
+        #region Soft Delete Operations
+
+        [HttpDelete("{id}/soft")]
+        public async Task<IActionResult> SoftDeleteApiKey(Guid id)
+        {
+            try
+            {
+                var result = await _apiKeyService.SoftDeleteAsync(id);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(new { success = true, message = result.Message });
+                }
+                
+                return NotFound(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in SoftDeleteApiKey for ID {Id}", id);
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        [HttpPatch("{id}/restore")]
+        public async Task<IActionResult> RestoreApiKey(Guid id)
+        {
+            try
+            {
+                var result = await _apiKeyService.RestoreAsync(id);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(new { success = true, message = result.Message });
+                }
+                
+                return NotFound(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in RestoreApiKey for ID {Id}", id);
+                return StatusCode(500, new { success = false, message = "Internal server error" });
+            }
+        }
+
+        [HttpGet("deleted")]
+        public async Task<IActionResult> GetDeletedApiKeys()
+        {
+            try
+            {
+                var result = await _apiKeyService.GetDeletedAsync();
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(new { success = true, data = result.Data, message = result.Message });
+                }
+                
+                return BadRequest(new { success = false, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetDeletedApiKeys");
                 return StatusCode(500, new { success = false, message = "Internal server error" });
             }
         }

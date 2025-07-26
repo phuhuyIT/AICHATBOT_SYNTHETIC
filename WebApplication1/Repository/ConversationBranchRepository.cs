@@ -15,8 +15,8 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(b => b.ConversationId == conversationId)
-                .Include(b => b.Messages)
+                .Where(b => b.ConversationId == conversationId && b.IsActive)
+                .Include(b => b.Messages.Where(m => m.IsActive))
                 .OrderBy(b => b.CreatedAt)
                 .ToListAsync();
         }
@@ -25,8 +25,8 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(b => b.ConversationId == conversationId && b.ParentBranchId == null)
-                .Include(b => b.Messages)
+                .Where(b => b.ConversationId == conversationId && b.ParentBranchId == null && b.IsActive)
+                .Include(b => b.Messages.Where(m => m.IsActive))
                 .FirstOrDefaultAsync();
         }
 
@@ -34,8 +34,8 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(b => b.ParentBranchId == parentBranchId)
-                .Include(b => b.Messages)
+                .Where(b => b.ParentBranchId == parentBranchId && b.IsActive)
+                .Include(b => b.Messages.Where(m => m.IsActive))
                 .OrderBy(b => b.CreatedAt)
                 .ToListAsync();
         }
@@ -44,9 +44,9 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Include(b => b.Messages.OrderBy(m => m.CreatedAt))
+                .Include(b => b.Messages.Where(m => m.IsActive).OrderBy(m => m.CreatedAt))
                 .Include(b => b.Conversation)
-                .FirstOrDefaultAsync(b => b.BranchId == branchId);
+                .FirstOrDefaultAsync(b => b.BranchId == branchId && b.IsActive);
         }
     }
 }

@@ -94,5 +94,14 @@ namespace WebApplication1.Repository
                 .AsNoTracking()
                 .CountAsync(c => c.UserId == userId && c.IsActive);
         }
+
+        public virtual async Task<IEnumerable<Conversation>> GetDeletedUserConversationsAsync(string userId)
+        {
+            return await _dbSet
+                .AsNoTracking()
+                .Where(c => c.UserId == userId && !c.IsActive)
+                .OrderByDescending(c => c.UpdatedAt ?? c.StartedAt)
+                .ToListAsync();
+        }
     }
 }

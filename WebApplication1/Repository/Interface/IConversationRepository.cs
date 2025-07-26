@@ -15,5 +15,8 @@ namespace WebApplication1.Repository.Interface
         Task<IEnumerable<Conversation>> GetPaginatedUserConversationsAsync(
             string userId, int pageNumber, int pageSize, bool includeBranches = false);
         Task<int> GetUserConversationCountAsync(string userId);
+        
+        // Soft delete method
+        Task<IEnumerable<Conversation>> GetDeletedUserConversationsAsync(string userId);
     }
 }

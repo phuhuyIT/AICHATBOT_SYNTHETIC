@@ -28,6 +28,10 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, string>
     public DbSet<Transaction> Transactions { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<ConversationBranch> ConversationBranches { get; set; }
+    
+    // New transaction-related entities
+    public DbSet<RechargePackage> RechargePackages { get; set; }
+    public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

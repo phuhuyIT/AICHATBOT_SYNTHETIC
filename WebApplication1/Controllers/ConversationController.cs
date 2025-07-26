@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Authorization;
 using WebApplication1.DTO.Conversation;
 using WebApplication1.Service.Interface;
 
@@ -66,8 +67,7 @@ namespace WebApplication1.Controllers
             return BadRequest(new { success = false, message = result.Message });
         }
 
-        // DELETE api/conversation/{id}
-        [HttpDelete("{id}")]
+        [HttpDelete("thanos-delete/{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var result = await _conversationService.DeleteAsync(id);
@@ -75,5 +75,47 @@ namespace WebApplication1.Controllers
                 return Ok(new { success = true, message = result.Message });
             return NotFound(new { success = false, message = result.Message });
         }
+
+        #region Soft Delete Endpoints
+
+        // DELETE api/conversation/{id}/soft
+        [HttpDelete("{id}/soft")]
+        public async Task<IActionResult> SoftDelete(Guid id, [FromQuery] string userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+                return BadRequest(new { success = false, message = "UserId is required" });
+
+            var result = await _conversationService.SoftDeleteConversationAsync(id, userId);
+            if (result.IsSuccess)
+                return Ok(new { success = true, message = result.Message });
+            return BadRequest(new { success = false, message = result.Message });
+        }
+
+        // POST api/conversation/{id}/restore
+        [HttpPost("{id}/restore")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Restore(Guid id, [FromQuery] string userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+                return BadRequest(new { success = false, message = "UserId is required" });
+
+            var result = await _conversationService.RestoreConversationAsync(id, userId);
+            if (result.IsSuccess)
+                return Ok(new { success = true, message = result.Message });
+            return BadRequest(new { success = false, message = result.Message });
+        }
+
+        // GET api/conversation/deleted/{userId}
+        [HttpGet("deleted/{userId}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetDeleted(string userId)
+        {
+            var result = await _conversationService.GetDeletedConversationsAsync(userId);
+            if (result.IsSuccess)
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            return BadRequest(new { success = false, message = result.Message });
+        }
+
+        #endregion
     }
 }

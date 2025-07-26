@@ -80,13 +80,11 @@ namespace WebApplication1.Service
                     return ServiceResult<string>.Failure("Refresh token not found");
                 }
 
-                // For now, we'll handle refresh tokens through a direct repository approach
-                // Since RefreshToken might not be properly integrated into UnitOfWork yet
                 var tokenEntity = await FindRefreshTokenAsync(refreshToken);
                 
-                if (tokenEntity == null || tokenEntity.ExpiryDate <= DateTime.UtcNow)
+                if (tokenEntity == null || !tokenEntity.IsActive || tokenEntity.IsExpired)
                 {
-                    return ServiceResult<string>.Failure("Invalid or expired refresh token");
+                    return ServiceResult<string>.Failure("Invalid, inactive, or expired refresh token");
                 }
 
                 // Get user and generate new access token
@@ -133,12 +131,14 @@ namespace WebApplication1.Service
                     return ServiceResult<bool>.Failure("User ID not found");
                 }
 
-                // Find and delete refresh token
+                // Find and soft delete refresh token by setting IsActive = false
                 var tokenEntity = await FindRefreshTokenAsync(refreshToken);
                 
                 if (tokenEntity != null && tokenEntity.UserId == userId)
                 {
-                    await _unitOfWork.RefreshTokenRepository.DeleteAsync(tokenEntity.RefreshTokenID);;
+                    tokenEntity.IsActive = false;
+                    await UpdateRefreshTokenAsync(tokenEntity);
+                    await _unitOfWork.SaveChangesAsync();
                 }
 
                 // Remove the cookie
@@ -165,8 +165,10 @@ namespace WebApplication1.Service
                     return ServiceResult<bool>.Failure("Refresh token not found");
                 }
 
-                // Delete the refresh token
-                await _unitOfWork.RefreshTokenRepository.DeleteAsync(refreshToken.RefreshTokenID);
+                // Soft delete the refresh token by setting IsActive = false
+                refreshToken.IsActive = false;
+                await UpdateRefreshTokenAsync(refreshToken);
+                await _unitOfWork.SaveChangesAsync();
 
                 // Remove the cookie
                 context.Response.Cookies.Delete("RefreshToken");
@@ -183,9 +185,9 @@ namespace WebApplication1.Service
                     return ServiceResult<bool>.Failure("Refresh token not found");
 
                 var refreshToken = await FindRefreshTokenAsync(token);
-                var isValid = refreshToken != null && refreshToken.ExpiryDate > DateTime.UtcNow;
+                var isValid = refreshToken != null && refreshToken.IsActive && !refreshToken.IsExpired;
                 if (!isValid)
-                    return ServiceResult<bool>.Failure("Invalid or expired refresh token");
+                    return ServiceResult<bool>.Failure("Invalid, inactive, or expired refresh token");
 
                 return ServiceResult<bool>.Success(true);
             }, _unitOfWork, _logger, "Error validating refresh token");
@@ -231,8 +233,7 @@ namespace WebApplication1.Service
         // RefreshToken repository operations using UnitOfWork
         private async Task<RefreshToken?> FindRefreshTokenAsync(string token)
         {
-            var allTokens = await _unitOfWork.RefreshTokenRepository.GetAllAsync();
-            return allTokens.FirstOrDefault(x => x.Token == token);
+            return await _unitOfWork.RefreshTokenRepository.FindAsync(x => x.Token == token);
         }
 
         private async Task UpdateRefreshTokenAsync(RefreshToken tokenEntity)

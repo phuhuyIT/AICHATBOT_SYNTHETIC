@@ -134,7 +134,7 @@ namespace WebApplication1.Controllers
         /// Logout action: clear the Refresh Token cookie
         /// </summary>
         [HttpPost("logout")]
-        [Authorize(Roles = "User")]
+        [Authorize]
         public async Task<IActionResult> Logout()
         {
             var deleteResult = await _tokenService.DeleteRefreshTokenAsync(HttpContext);
@@ -145,6 +145,7 @@ namespace WebApplication1.Controllers
 
             // clear cookies
             Response.Cookies.Delete("refreshToken", new CookieOptions { HttpOnly = true, Secure = true });
+            Response.Cookies.Delete("accessToken", new CookieOptions { HttpOnly = true, Secure = true });   
 
             return Ok(new { success = true, message = "Logout successful" });
         }

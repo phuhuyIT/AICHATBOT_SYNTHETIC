@@ -15,7 +15,7 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => m.BranchId == branchId)
+                .Where(m => m.BranchId == branchId && m.IsActive)
                 .Include(m => m.ParentMessage)
                 .OrderBy(m => m.CreatedAt)
                 .ToListAsync();
@@ -25,7 +25,7 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => m.BranchId == branchId)
+                .Where(m => m.BranchId == branchId && m.IsActive)
                 .OrderByDescending(m => m.CreatedAt)
                 .FirstOrDefaultAsync();
         }
@@ -34,7 +34,7 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => m.ModelUsed == modelName)
+                .Where(m => m.ModelUsed == modelName && m.IsActive)
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync();
         }
@@ -43,14 +43,15 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .CountAsync(m => m.BranchId == branchId);
+                .CountAsync(m => m.BranchId == branchId && m.IsActive);
         }
 
         public async Task<IEnumerable<Message>> GetPaginatedMessagesAsync(Guid branchId, int pageNumber, int pageSize)
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => m.BranchId == branchId)
+                .Where(m => m.BranchId == branchId && m.IsActive)
+                .Include(m => m.ParentMessage)
                 .OrderBy(m => m.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -61,7 +62,7 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => m.BranchId == branchId && m.Role == role)
+                .Where(m => m.BranchId == branchId && m.Role == role && m.IsActive)
                 .OrderBy(m => m.CreatedAt)
                 .ToListAsync();
         }
@@ -77,7 +78,7 @@ namespace WebApplication1.Repository
 
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => branchIds.Contains(m.BranchId))
+                .Where(m => branchIds.Contains(m.BranchId) && m.IsActive)
                 .Include(m => m.ParentMessage)
                 .OrderBy(m => m.CreatedAt)
                 .ToListAsync();
@@ -87,7 +88,7 @@ namespace WebApplication1.Repository
         {
             return await _dbSet
                 .AsNoTracking()
-                .Where(m => m.BranchId == branchId)
+                .Where(m => m.BranchId == branchId && m.IsActive)
                 .OrderByDescending(m => m.CreatedAt)
                 .Take(count)
                 .ToListAsync();
@@ -113,7 +114,7 @@ namespace WebApplication1.Repository
                 .AsNoTracking()
                 .Where(m => m.BranchId == branchId && 
                            m.CreatedAt >= startDate && 
-                           m.CreatedAt <= endDate)
+                           m.CreatedAt <= endDate && m.IsActive)
                 .OrderBy(m => m.CreatedAt)
                 .ToListAsync();
         }

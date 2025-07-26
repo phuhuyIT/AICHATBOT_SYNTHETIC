@@ -142,6 +142,73 @@ public class RoleController : ControllerBase
 
     #endregion
 
+    #region Soft Delete Operations
+
+    [HttpDelete("{id}/soft")]
+    public async Task<IActionResult> SoftDeleteRole(Guid id)
+    {
+        try
+        {
+            var result = await _roleService.SoftDeleteAsync(id);
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, message = result.Message });
+            }
+            
+            return NotFound(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in SoftDeleteRole for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    [HttpPatch("{id}/restore")]
+    public async Task<IActionResult> RestoreRole(Guid id)
+    {
+        try
+        {
+            var result = await _roleService.RestoreAsync(id);
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, message = result.Message });
+            }
+            
+            return NotFound(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in RestoreRole for ID {Id}", id);
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    [HttpGet("deleted")]
+    public async Task<IActionResult> GetDeletedRoles()
+    {
+        try
+        {
+            var result = await _roleService.GetDeletedAsync();
+            
+            if (result.IsSuccess)
+            {
+                return Ok(new { success = true, data = result.Data, message = result.Message });
+            }
+            
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetDeletedRoles");
+            return StatusCode(500, new { success = false, message = "Internal server error" });
+        }
+    }
+
+    #endregion
+
     #region Additional Operations
 
     [HttpGet("active")]

@@ -13,5 +13,10 @@ namespace WebApplication1.Service.Interface
         Task<ServiceResult<TResponseDto>> CreateAsync(TCreateDto createDto);
         Task<ServiceResult<TResponseDto>> UpdateAsync(Guid id, TUpdateDto updateDto);
         Task<ServiceResult<bool>> DeleteAsync(Guid id);
+        
+        // Soft delete methods
+        Task<ServiceResult<bool>> SoftDeleteAsync(Guid id);
+        Task<ServiceResult<bool>> RestoreAsync(Guid id);
+        Task<ServiceResult<IEnumerable<TResponseDto>>> GetDeletedAsync();
     }
 }

@@ -12,5 +12,10 @@ namespace WebApplication1.Service.Interface
         Task<ServiceResult<bool>> EndConversationAsync(Guid conversationId, string userId);
         Task<ServiceResult<Conversation>> GetOrCreateActiveConversationAsync(string userId, bool isPaidUser);
         Task<ServiceResult<bool>> ValidateConversationAccessAsync(Guid conversationId, string userId);
+        
+        // Soft delete methods
+        Task<ServiceResult<bool>> SoftDeleteConversationAsync(Guid conversationId, string userId);
+        Task<ServiceResult<bool>> RestoreConversationAsync(Guid conversationId, string userId);
+        Task<ServiceResult<IEnumerable<Conversation>>> GetDeletedConversationsAsync(string userId);
     }
 }

@@ -26,6 +26,8 @@ public partial class ConversationBranch : AuditableEntity
 
     // running summary
     public string? Summary { get; set; }
+    
+    public bool IsActive { get; set; } = true;
 
     // optimistic‑concurrency token
     [Timestamp]

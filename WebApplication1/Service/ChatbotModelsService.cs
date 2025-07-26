@@ -64,7 +64,7 @@ public class ChatbotModelsService : IChatbotModelsService
         return await ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
         {
             var models = await _unitOfWork.ChatbotModelsRepository.GetAllAsync();
-            var dtos = ChatbotModelMappingService.ToResponseDTOList(models);
+            var dtos = GenericMappingService.MapToList<ChatbotModel, ChatbotModelResponseDTO>(models);
             return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Success(dtos);
         },_unitOfWork ,_logger, "Error retrieving all ChatbotModels");
     }
@@ -175,12 +175,70 @@ public class ChatbotModelsService : IChatbotModelsService
 
     private static ServiceResult<ChatbotModelResponseDTO> CreateSuccessResponse(ChatbotModel model, string message = "")
     {
-        var dto = ChatbotModelMappingService.ToResponseDTO(model);
+        var dto = GenericMappingService.MapToResponseDTO<ChatbotModel, ChatbotModelResponseDTO>(model);
         return dto != null 
             ? ServiceResult<ChatbotModelResponseDTO>.Success(dto, message)
             : ServiceResult<ChatbotModelResponseDTO>.Failure("Failed to map chatbot model");
     }
 
+
+    #endregion
+
+    #region Soft Delete Methods
+
+    public async Task<ServiceResult<bool>> SoftDeleteAsync(Guid id)
+    {
+        return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+        {
+            var existingModel = await _unitOfWork.ChatbotModelsRepository.GetByIdIncludingDeletedAsync(id);
+            if (existingModel == null)
+            {
+                return ServiceResult<bool>.Failure("ChatbotModel not found");
+            }
+
+            var result = await _unitOfWork.ChatbotModelsRepository.SoftDeleteAsync(id);
+            if (!result)
+            {
+                return ServiceResult<bool>.Failure("Failed to soft delete ChatbotModel");
+            }
+
+            _logger.LogInformation("ChatbotModel {ModelId} soft deleted successfully", id);
+            return ServiceResult<bool>.Success(true, "ChatbotModel soft deleted successfully");
+        }, _unitOfWork, _logger, $"Error soft deleting ChatbotModel with ID {id}");
+    }
+
+    public async Task<ServiceResult<bool>> RestoreAsync(Guid id)
+    {
+        return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+        {
+            var existingModel = await _unitOfWork.ChatbotModelsRepository.GetByIdIncludingDeletedAsync(id);
+            if (existingModel == null)
+            {
+                return ServiceResult<bool>.Failure("ChatbotModel not found");
+            }
+
+            var result = await _unitOfWork.ChatbotModelsRepository.RestoreAsync(id);
+            if (!result)
+            {
+                return ServiceResult<bool>.Failure("Failed to restore ChatbotModel");
+            }
+
+            _logger.LogInformation("ChatbotModel {ModelId} restored successfully", id);
+            return ServiceResult<bool>.Success(true, "ChatbotModel restored successfully");
+        }, _unitOfWork, _logger, $"Error restoring ChatbotModel with ID {id}");
+    }
+
+    public async Task<ServiceResult<IEnumerable<ChatbotModelResponseDTO>>> GetDeletedAsync()
+    {
+        return await ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
+        {
+            // Use GetAllIncludingDeletedAsync and filter for deleted items
+            var allModels = await _unitOfWork.ChatbotModelsRepository.GetAllIncludingDeletedAsync();
+            var deletedModels = allModels.Where(m => !m.IsActive);
+            var dtos = GenericMappingService.MapToList<ChatbotModel, ChatbotModelResponseDTO>(deletedModels);
+            return ServiceResult<IEnumerable<ChatbotModelResponseDTO>>.Success(dtos);
+        }, _unitOfWork, _logger, "Error retrieving deleted ChatbotModels");
+    }
 
     #endregion
 }

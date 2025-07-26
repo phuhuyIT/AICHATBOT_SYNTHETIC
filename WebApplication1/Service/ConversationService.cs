@@ -9,13 +9,13 @@ namespace WebApplication1.Service
 {
     public class ConversationService : IConversationService
     {
-        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<ConversationService> _logger;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public ConversationService(IUnitOfWork unitOfWork, ILogger<ConversationService> logger)
+        public ConversationService(ILogger<ConversationService> logger, IUnitOfWork unitOfWork)
         {
-            _unitOfWork = unitOfWork;
             _logger = logger;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<ServiceResult<Conversation>> StartNewConversationAsync(string userId, bool isPaidUser)
@@ -121,16 +121,31 @@ namespace WebApplication1.Service
         {
             return await ServiceResult<ConversationResponseDTO>.ExecuteWithTransactionAsync(async () =>
             {
-                var entity = ConversationMappingService.ToEntity(createDto);
+                var entity = GenericMappingService.MapToEntity<ConversationCreateDTO, Conversation>(createDto);
+                // Set specific properties that need special handling
+                entity.StartedAt = DateTime.UtcNow;
+                
                 await _unitOfWork.ConversationRepository.AddAsync(entity);
+                
+                var dto = GenericMappingService.MapToResponseDTO<Conversation, ConversationResponseDTO>(entity);
+                return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation created successfully");
+            }, _unitOfWork, _logger, "Error creating conversation");
+        }
 
-                var dto = ConversationMappingService.ToResponseDTO(entity);
-                return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation created");
-            }, _unitOfWork, _logger, $"Error creating conversation for user {createDto.UserId}");
+        public async Task<ServiceResult<IEnumerable<ConversationResponseDTO>>> GetAllAsync()
+        {
+            return await ServiceResult<IEnumerable<ConversationResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
+            {
+                var conversations = await _unitOfWork.ConversationRepository.GetAllAsync();
+                var dtos = conversations.Select(c => GenericMappingService.MapToResponseDTO<Conversation, ConversationResponseDTO>(c)).ToList();
+                return ServiceResult<IEnumerable<ConversationResponseDTO>>.Success(dtos);
+            }, _unitOfWork, _logger, "Error retrieving all conversations");
         }
 
         public async Task<ServiceResult<ConversationResponseDTO>> UpdateAsync(Guid id, ConversationUpdateDTO updateDto)
         {
+            // ...existing validation code...
+
             return await ServiceResult<ConversationResponseDTO>.ExecuteWithTransactionAsync(async () =>
             {
                 var entity = await _unitOfWork.ConversationRepository.GetByIdAsync(id);
@@ -139,22 +154,23 @@ namespace WebApplication1.Service
                     return ServiceResult<ConversationResponseDTO>.Failure("Conversation not found");
                 }
 
-                ConversationMappingService.UpdateEntity(entity, updateDto);
+                GenericMappingService.UpdateEntityFromDTO(updateDto, entity);
                 await _unitOfWork.ConversationRepository.UpdateAsync(entity);
-
-                var dto = ConversationMappingService.ToResponseDTO(entity);
-                return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation updated");
+                
+                var dto = GenericMappingService.MapToResponseDTO<Conversation, ConversationResponseDTO>(entity);
+                return ServiceResult<ConversationResponseDTO>.Success(dto, "Conversation updated successfully");
             }, _unitOfWork, _logger, $"Error updating conversation {id}");
         }
 
-        public async Task<ServiceResult<IEnumerable<ConversationResponseDTO>>> GetAllAsync()
+        public async Task<ServiceResult<IEnumerable<ConversationResponseDTO>>> GetConversationsByUserIdAsync(string userId)
         {
             return await ServiceResult<IEnumerable<ConversationResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
             {
-                var conversations = await _unitOfWork.ConversationRepository.GetAllAsync();
-                var dtos = conversations.Select(ConversationMappingService.ToResponseDTO);
+                // Use the correct method name that exists in the repository
+                var conversations = await _unitOfWork.ConversationRepository.GetUserConversationsAsync(userId);
+                var dtos = conversations.Select(c => GenericMappingService.MapToResponseDTO<Conversation, ConversationResponseDTO>(c)).ToList();
                 return ServiceResult<IEnumerable<ConversationResponseDTO>>.Success(dtos);
-            }, _unitOfWork,_logger, "Error getting all conversations");
+            }, _unitOfWork, _logger, $"Error getting conversations for user {userId}");
         }
 
         public async Task<ServiceResult<ConversationResponseDTO>> GetByIdAsync(Guid id)
@@ -165,9 +181,9 @@ namespace WebApplication1.Service
                 if (entity == null)
                     return ServiceResult<ConversationResponseDTO>.Failure("Conversation not found");
 
-                var dto = ConversationMappingService.ToResponseDTO(entity);
+                var dto = GenericMappingService.MapToResponseDTO<Conversation, ConversationResponseDTO>(entity);
                 return ServiceResult<ConversationResponseDTO>.Success(dto);
-            }, _unitOfWork,_logger, $"Error getting conversation {id}");
+            }, _unitOfWork, _logger, $"Error getting conversation {id}");
         }
 
         public async Task<ServiceResult<bool>> DeleteAsync(Guid id)
@@ -182,6 +198,109 @@ namespace WebApplication1.Service
 
                 return ServiceResult<bool>.Success(true, "Conversation deleted");
             }, _unitOfWork, _logger, $"Error deleting conversation {id}");
+        }
+
+        #endregion
+
+        #region Soft Delete Methods
+
+        public async Task<ServiceResult<bool>> SoftDeleteConversationAsync(Guid conversationId, string userId)
+        {
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+            {
+                // Validate user access
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
+                if (!hasAccess)
+                {
+                    return ServiceResult<bool>.Failure("Access denied or conversation not found");
+                }
+
+                var result = await _unitOfWork.ConversationRepository.SoftDeleteAsync(conversationId);
+                if (!result)
+                {
+                    return ServiceResult<bool>.Failure("Conversation not found");
+                }
+
+                _logger.LogInformation("Conversation {ConversationId} soft deleted by user {UserId}", conversationId, userId);
+                return ServiceResult<bool>.Success(true, "Conversation deleted");
+            }, _unitOfWork, _logger, $"Error soft deleting conversation {conversationId}");
+        }
+
+        public async Task<ServiceResult<bool>> RestoreConversationAsync(Guid conversationId, string userId)
+        {
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+            {
+                // Validate user access
+                var hasAccess = await _unitOfWork.ConversationRepository.IsConversationOwnedByUserAsync(conversationId, userId);
+                if (!hasAccess)
+                {
+                    return ServiceResult<bool>.Failure("Access denied or conversation not found");
+                }
+
+                var result = await _unitOfWork.ConversationRepository.RestoreAsync(conversationId);
+                if (!result)
+                {
+                    return ServiceResult<bool>.Failure("Conversation not found");
+                }
+
+                _logger.LogInformation("Conversation {ConversationId} restored by user {UserId}", conversationId, userId);
+                return ServiceResult<bool>.Success(true, "Conversation restored");
+            }, _unitOfWork, _logger, $"Error restoring conversation {conversationId}");
+        }
+
+        public async Task<ServiceResult<IEnumerable<Conversation>>> GetDeletedConversationsAsync(string userId)
+        {
+            return await ServiceResult<IEnumerable<Conversation>>.ExecuteWithErrorHandlingAsync(async () =>
+            {
+                var conversations = await _unitOfWork.ConversationRepository.GetDeletedUserConversationsAsync(userId);
+                return ServiceResult<IEnumerable<Conversation>>.Success(conversations);
+            }, _unitOfWork, _logger, $"Error getting deleted conversations for user {userId}");
+        }
+
+        #endregion
+
+        #region IWriteService Soft Delete Methods Implementation
+
+        public async Task<ServiceResult<bool>> SoftDeleteAsync(Guid id)
+        {
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+            {
+                var result = await _unitOfWork.ConversationRepository.SoftDeleteAsync(id);
+                if (!result)
+                {
+                    return ServiceResult<bool>.Failure("Conversation not found");
+                }
+
+                _logger.LogInformation("Conversation {ConversationId} soft deleted", id);
+                return ServiceResult<bool>.Success(true, "Conversation deleted");
+            }, _unitOfWork, _logger, $"Error soft deleting conversation {id}");
+        }
+
+        public async Task<ServiceResult<bool>> RestoreAsync(Guid id)
+        {
+            return await ServiceResult<bool>.ExecuteWithTransactionAsync(async () =>
+            {
+                var result = await _unitOfWork.ConversationRepository.RestoreAsync(id);
+                if (!result)
+                {
+                    return ServiceResult<bool>.Failure("Conversation not found");
+                }
+
+                _logger.LogInformation("Conversation {ConversationId} restored", id);
+                return ServiceResult<bool>.Success(true, "Conversation restored");
+            }, _unitOfWork, _logger, $"Error restoring conversation {id}");
+        }
+
+        public async Task<ServiceResult<IEnumerable<ConversationResponseDTO>>> GetDeletedAsync()
+        {
+            return await ServiceResult<IEnumerable<ConversationResponseDTO>>.ExecuteWithErrorHandlingAsync(async () =>
+            {
+                // Use GetAllIncludingDeletedAsync and filter for deleted items
+                var allConversations = await _unitOfWork.ConversationRepository.GetAllIncludingDeletedAsync();
+                var deletedConversations = allConversations.Where(c => !c.IsActive);
+                var dtos = deletedConversations.Select(c => GenericMappingService.MapToResponseDTO<Conversation, ConversationResponseDTO>(c)).ToList();
+                return ServiceResult<IEnumerable<ConversationResponseDTO>>.Success(dtos);
+            }, _unitOfWork, _logger, "Error retrieving deleted conversations");
         }
 
         #endregion
