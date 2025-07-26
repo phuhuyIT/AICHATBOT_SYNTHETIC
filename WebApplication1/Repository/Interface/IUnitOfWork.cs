@@ -11,6 +11,11 @@ namespace WebApplication1.Repository.Interface
         IGenericRepository<RefreshToken> RefreshTokenRepository { get; }
         ITemplateRepository TemplateRepository { get; }
         
+        // Add transaction-related repositories
+        ITransactionRepository TransactionRepository { get; }
+        IRechargePackageRepository RechargePackageRepository { get; }
+        IPaymentTransactionRepository PaymentTransactionRepository { get; }
+        
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

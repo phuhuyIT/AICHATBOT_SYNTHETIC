@@ -18,6 +18,11 @@ namespace WebApplication1.Repository
         private IChatbotModelsRepository? _chatbotModelsRepository;
         private IGenericRepository<RefreshToken>? _refreshTokenRepository;
         private ITemplateRepository? _templateRepository;
+        
+        // Add transaction-related repository fields
+        private ITransactionRepository? _transactionRepository;
+        private IRechargePackageRepository? _rechargePackageRepository;
+        private IPaymentTransactionRepository? _paymentTransactionRepository;
 
         public UnitOfWork(ApplicationDbContext context,
             IConversationRepository conversationRepository,
@@ -50,6 +55,16 @@ namespace WebApplication1.Repository
             new GenericRepository<RefreshToken>(_context);
 
         public ITemplateRepository TemplateRepository => _templateRepository!;
+
+        // Add transaction-related repository properties
+        public ITransactionRepository TransactionRepository => _transactionRepository ??= 
+            new TransactionRepository(_context);
+
+        public IRechargePackageRepository RechargePackageRepository => _rechargePackageRepository ??= 
+            new RechargePackageRepository(_context);
+
+        public IPaymentTransactionRepository PaymentTransactionRepository => _paymentTransactionRepository ??= 
+            new PaymentTransactionRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

@@ -12,9 +12,7 @@ namespace WebApplication1.Models
         public string Token { get; set; }
         public DateTime ExpiryDate { get; set; }
         public bool IsExpired => DateTime.UtcNow >= ExpiryDate;
-        public bool IsActive => !IsRevoked && !IsExpired;
-        public DateTime? Revoked { get; set; }
-        public bool IsRevoked => Revoked.HasValue;
+        public bool IsActive { get; set; } = true;
         public virtual User? User { get; set; }
     }
 }

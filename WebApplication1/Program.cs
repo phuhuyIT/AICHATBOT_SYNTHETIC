@@ -25,6 +25,7 @@ namespace WebApplication1
             // Register memory caching
             builder.Services.AddMemoryCache();
             builder.Services.AddScoped<ICacheService, MemoryCacheService>();
+            builder.Services.AddHttpClient();
 
             // Register the DbContext with the connection string
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -99,7 +100,14 @@ namespace WebApplication1
             // Register Chat Services
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<IConversationService, ConversationService>();
-            builder.Services.AddHttpClient(); // Required for AI API calls
+            
+            // Register Transaction Services
+            builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+            builder.Services.AddScoped<IRechargePackageRepository, RechargePackageRepository>();
+            builder.Services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
+            builder.Services.AddScoped<ITransactionService, TransactionService>();
+            builder.Services.AddScoped<IRechargeService, RechargeService>();
+            builder.Services.AddScoped<IPaymentService, PaymentService>();
             
             // Register Repository
             builder.Services.AddScoped<ITemplateRepository, TemplateRepository>();
@@ -107,6 +115,7 @@ namespace WebApplication1
             builder.Services.AddScoped<IConversationBranchRepository, ConversationBranchRepository>();
             builder.Services.AddScoped<IMessageRepository, MessageRepository>();
             builder.Services.AddScoped<IChatbotModelsRepository, ChatbotModelsRepository>();
+            builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             
