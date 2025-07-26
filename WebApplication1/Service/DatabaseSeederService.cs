@@ -140,10 +140,9 @@ public class DatabaseSeederService : IDatabaseSeederService
         var systemUser = await _userManager.FindByEmailAsync(systemUserConfig.Email);
         if (systemUser == null)
         {
-            await SeedSystemUserAsync();
             systemUser = await _userManager.FindByEmailAsync(systemUserConfig.Email);
         }
         
-        return systemUser?.Id ?? throw new InvalidOperationException("System user not found and could not be created");
+        return systemUser?.Id;
     }
 }
